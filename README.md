@@ -1,36 +1,15 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 도서부 출석체크
 
-## Getting Started
+Google Apps Script 웹앱입니다. 화면(`Index.html`), 서버 로직(`Code.gs`), DB(구글 시트)가 모두 구글에서 돌아갑니다.
 
-First, run the development server:
+## 처음 설정
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. `clasp push -f`로 올립니다. (`.clasp.json`의 `scriptId`는 직접 만들어야 합니다: `clasp create` 또는 `clasp clone <scriptId>`)
+2. 스크립트 속성에 `NEIS_KEY`(NEIS 인증키)를 추가합니다.
+3. 편집기에서 `setup`(시트·트리거 생성), `findSchool`(학교 코드 저장)을 한 번씩 실행합니다.
+4. 배포 → 웹 앱(실행 계정: 나, 액세스: 모든 사용자)으로 배포합니다. 코드를 고친 뒤에는 배포 관리에서 새 버전으로 올려야 반영됩니다.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 규칙
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- 당번: 점심 전 12:30~13:00, 점심 후 13:00~13:20, 저녁 18:00~18:20 (마감 시각에 미출석이면 결석)
+- 결석 면제(NEIS 학사일정 기준): 휴업일·공휴일, 정기시험 2주 전~시험 마지막 날, 해외체험학습·졸업식·종업식·진로탐색활동·이공계 대학탐방(해당 학년). 규칙은 `Code.gs`의 `EXEMPT_EVENT_WORDS` 등에 있습니다.
