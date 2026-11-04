@@ -11,7 +11,7 @@ var DEADLINE_MINUTE = { 1: 13 * 60, 3: 13 * 60 + 20, 2: 18 * 60 + 20 };
 var SHIFT_ORDER = { 1: 1, 3: 2, 2: 3 }; // 목록 정렬용: 점심 전, 점심 후, 저녁
 
 var SCHEMA = {
-  User: ['id', 'name', 'grade', 'day', 'shift', 'workCount', 'addCount', 'runCount', 'createdAt', 'updatedAt'],
+  User: ['id', 'name', 'grade', 'day', 'shift', 'workCount', 'addCount', 'runCount', 'createdAt', 'updatedAt', 'type'], // type: 0 졸업생, 1 재학생
   choolsuck: ['id', 'userId', 'day', 'shift', 'kind', 'date', 'detail', 'createdAt', 'updatedAt'],
 };
 var TEXT_COLS = ['name', 'kind', 'date', 'detail', 'createdAt', 'updatedAt'];
@@ -66,7 +66,8 @@ function read_(table) {
   return vals.slice(1).map(function (v, i) {
     var o = { _row: i + 2 };
     cols.forEach(function (c, j) {
-      o[c] = TEXT_COLS.indexOf(c) >= 0 ? String(v[j]) : Number(v[j]);
+      // type 열이 없던 시절의 행은 재학생으로 본다
+      o[c] = TEXT_COLS.indexOf(c) >= 0 ? String(v[j]) : c === 'type' && v[j] === '' ? 1 : Number(v[j]);
     });
     return o;
   });
@@ -82,6 +83,15 @@ function write_(table, row) {
   // 시트가 늘어나며 새로 생긴 행은 텍스트 서식을 물려받지 못할 수 있어 쓸 때마다 지정한다
   range.setNumberFormats([cols.map(function (c) { return TEXT_COLS.indexOf(c) >= 0 ? '@' : '0'; })]);
   range.setValues([values]);
+}
+
+function writeAll_(table, rows) {
+  if (!rows.length) return;
+  var cols = SCHEMA[table];
+  var values = rows.map(function (r) {
+    return cols.map(function (c) { return r[c] === undefined ? '' : r[c]; });
+  });
+  sheet_(table).getRange(2, 1, rows.length, cols.length).setValues(values);
 }
 
 function dup_(rows, keys, row, exceptId) {
@@ -173,6 +183,7 @@ function result_(ok, message) {
 // 오늘 마감이 지난 당번 중 출석하지 않은 부원을 결석(absent)으로 기록하고 runCount를 1 올린다.
 // 같은 (부원, 날짜, 당번, 종류)는 insert_의 unique 검사로 한 번만 들어가므로 여러 번 불러도 된다.
 function recordAbsencesToday() {
+  promoteYearly();
   var now = new Date();
   var date = today_(now);
   var range = parseDate_(date);
@@ -193,7 +204,7 @@ function recordAbsencesToday() {
   }
 
   locked_(function () {
-    var users = read_('User');
+    var users = read_('User').filter(function (u) { return u.type === 1; });
     var records = read_('choolsuck').filter(function (r) { return r.date === date; });
     due.forEach(function (shift) {
       var deadline = new Date(range.start.getTime() + DEADLINE_MINUTE[shift] * 60 * 1000);
@@ -227,7 +238,7 @@ function api_home() {
   recordAbsencesToday();
   var date = today_();
   var current = currentShift_();
-  var users = read_('User');
+  var users = read_('User').filter(function (u) { return u.type === 1; });
 
   var duty = [];
   if (current) {
@@ -260,7 +271,7 @@ function api_attend(userId, detail) {
 
   return locked_(function () {
     var member = read_('User').filter(function (u) {
-      return u.id === userId && u.day === current.day && u.shift === current.shift;
+      return u.type === 1 && u.id === userId && u.day === current.day && u.shift === current.shift;
     })[0];
     if (!member) return result_(false, '지금 당번이 아닙니다.');
 
@@ -290,7 +301,7 @@ function api_makeup(userId, detail) {
   if (!today.day) return result_(false, '주말에는 보충할 수 없습니다.');
 
   return locked_(function () {
-    var member = read_('User').filter(function (u) { return u.id === userId; })[0];
+    var member = read_('User').filter(function (u) { return u.type === 1 && u.id === userId; })[0];
     if (!member) return result_(false, '부원을 선택하세요.');
 
     var current = currentShift_();
@@ -326,7 +337,10 @@ function api_admin(date) {
   try {
     exempt = exemption_(date);
   } catch (e) {} // 학사일정을 못 읽어도 출석 화면은 보여 준다(면제 표시만 빠진다)
-  return { today: today, date: date, day: range.day, users: read_('User').sort(byName_), records: records, exempt: exempt };
+  var users = read_('User').filter(function (u) {
+    return u.type === 1 || records.some(function (r) { return r.userId === u.id; });
+  });
+  return { today: today, date: date, day: range.day, users: users.sort(byName_), records: records, exempt: exempt };
 }
 
 function api_members() {
@@ -350,8 +364,8 @@ function api_addMember(d) {
   return locked_(function () {
     var row = insert_(
       'User',
-      { name: String(d.name).trim(), grade: Number(d.grade), day: Number(d.day), shift: Number(d.shift), workCount: 0, addCount: 0, runCount: 0 },
-      ['name']
+      { name: String(d.name).trim(), grade: Number(d.grade), day: Number(d.day), shift: Number(d.shift), workCount: 0, addCount: 0, runCount: 0, type: 1 },
+      ['name', 'type']
     );
     return row ? result_(true, '추가되었습니다.') : result_(false, '이미 같은 이름의 부원이 있습니다.');
   });
@@ -366,11 +380,58 @@ function api_updateMember(id, d) {
       Number(id),
       { name: String(d.name).trim(), grade: Number(d.grade), day: Number(d.day), shift: Number(d.shift) },
       null,
-      ['name']
+      ['name', 'type']
     );
     if (r === 'DUP') return result_(false, '이미 같은 이름의 부원이 있습니다.');
     if (r === 'NOTFOUND') return result_(false, '존재하지 않는 부원입니다.');
     return result_(true, '수정되었습니다.');
+  });
+}
+
+// 조기졸업처럼 사람이 직접 졸업 처리한다. 기록은 남는다.
+function api_graduate(id) {
+  return locked_(function () {
+    var r = update_('User', Number(id), { type: 0 });
+    return r === 'NOTFOUND' ? result_(false, '존재하지 않는 부원입니다.') : result_(true, '졸업 처리되었습니다.');
+  });
+}
+
+function api_restore(id) {
+  return locked_(function () {
+    var r = update_('User', Number(id), { type: 1 }, null, ['name', 'type']);
+    if (r === 'DUP') return result_(false, '같은 이름의 재학생이 있어 복귀할 수 없습니다.');
+    if (r === 'NOTFOUND') return result_(false, '존재하지 않는 부원입니다.');
+    return result_(true, '재학생으로 복귀했습니다.');
+  });
+}
+
+// 3월 1일 진급: 3학년은 졸업(type 0), 1·2학년은 학년 +1. 3/1 이후에 등록된 신입생과 이미 졸업한 부원은 그대로 둔다.
+function promote_(users, cutoffISO, nowISO) {
+  var changed = 0;
+  users.forEach(function (u) {
+    if (u.type !== 1 || u.createdAt >= cutoffISO) return;
+    if (u.grade >= 3) u.type = 0;
+    else u.grade += 1;
+    u.updatedAt = nowISO;
+    changed++;
+  });
+  return changed;
+}
+
+// 3월(1~31일)에 올해 진급을 아직 안 했으면 한 번만 실행한다. 5분 트리거와 화면 접속 때 확인한다.
+function promoteYearly() {
+  var date = today_();
+  var year = Number(date.slice(0, 4));
+  if (date < year + '-03-01' || date > year + '-03-31') return;
+  var props = PropertiesService.getScriptProperties();
+  var done = function () { return Number(props.getProperty('PROMOTED_YEAR')) >= year; };
+  if (done()) return;
+  locked_(function () {
+    if (done()) return; // 락을 기다리는 사이 다른 실행이 끝냈을 수 있다
+    var users = read_('User');
+    promote_(users, parseDate_(year + '-03-01').start.toISOString(), new Date().toISOString());
+    writeAll_('User', users);
+    props.setProperty('PROMOTED_YEAR', String(year));
   });
 }
 

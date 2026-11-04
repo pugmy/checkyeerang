@@ -523,23 +523,75 @@ function deleteModal(m) {
   });
 }
 
+function graduateModal(m) {
+  let pending = false;
+  openModal({ label: '졸업 처리 확인', alert: true, narrow: true, canClose: () => !pending }, (box, close) => {
+    const go = h('button', { type: 'button', class: 'btn primary' }, '졸업 처리');
+    const cancel = h('button', { type: 'button', class: 'btn ghost', onclick: close }, '취소');
+    go.onclick = async () => {
+      pending = true;
+      cancel.disabled = true;
+      try { await busy(go, '처리 중...', () => api('api_graduate', m.id)); }
+      catch (e) { alert(errText(e)); }
+      pending = false;
+      close();
+      show('member');
+    };
+    box.append(
+      h('h3', {}, m.name + ' 부원을 졸업 처리할까요?'),
+      h('p', { class: 'muted', style: 'font-size:.9rem' }, '조기졸업처럼 직접 처리할 때 씁니다. 출석 기록은 남고, 아래 졸업생 목록에서 되돌릴 수 있습니다.'),
+      h('div', { class: 'actions' }, cancel, go));
+  });
+}
+
+function statsList(m) {
+  return h('dl', { class: 'stats' }, [['출석', m.workCount, 'ok-text'], ['보충', m.addCount, ''], ['결석', m.runCount, 'bad-text']].map(([l, v, c]) =>
+    h('div', {}, h('dt', {}, l), h('dd', { class: c, style: c ? '' : 'color:var(--brand)' }, v))));
+}
+
+function nameBlock(m, sub) {
+  return h('div', { class: 'info' },
+    h('p', { class: 'bold', style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, m.name + ' ', h('span', { class: 'name-sub' }, m.grade + '학년')),
+    h('p', { class: 'muted', style: 'font-size:.9rem' }, sub));
+}
+
 async function renderMember() {
-  const members = await api('api_members');
+  const all = await api('api_members');
+  const members = all.filter((m) => m.type === 1);
+  const alumni = all.filter((m) => m.type !== 1);
+
   const list = members.length === 0
     ? h('div', { class: 'card big' }, h('p', { class: 'bold' }, '등록된 부원이 없어요'), h('p', { class: 'muted', style: 'font-size:.9rem' }, '오른쪽 위 “부원 추가”로 시작해 보세요.'))
     : h('ul', { class: 'col', style: 'gap:.5rem' }, members.map((m) =>
         h('li', { class: 'card member' },
-          h('div', { class: 'info' },
-            h('p', { class: 'bold', style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, m.name + ' ', h('span', { class: 'name-sub' }, m.grade + '학년')),
-            h('p', { class: 'muted', style: 'font-size:.9rem' }, DAYS[m.day - 1] + '요일 · ' + SHIFT[m.shift])),
-          h('dl', { class: 'stats' }, [['출석', m.workCount, 'ok-text'], ['보충', m.addCount, ''], ['결석', m.runCount, 'bad-text']].map(([l, v, c]) =>
-            h('div', {}, h('dt', {}, l), h('dd', { class: c, style: c ? '' : 'color:var(--brand)' }, v)))),
+          nameBlock(m, DAYS[m.day - 1] + '요일 · ' + SHIFT[m.shift]),
+          statsList(m),
           h('div', { class: 'row' },
             h('button', { type: 'button', class: 'btn ghost sm', onclick: () => memberModal(m) }, '수정'),
+            h('button', { type: 'button', class: 'btn ghost sm', onclick: () => graduateModal(m) }, '졸업'),
             h('button', { type: 'button', class: 'btn danger sm', onclick: () => deleteModal(m) }, '삭제')))));
+
+  const restore = async (btn, m) => {
+    let r;
+    try { r = await busy(btn, '처리 중...', () => api('api_restore', m.id)); }
+    catch (e) { r = { ok: false, message: errText(e) }; }
+    if (r.ok) show('member'); else alert(r.message);
+  };
+  const graduates = alumni.length > 0 && h('details', { class: 'mt8' },
+    h('summary', { class: 'bold', style: 'cursor:pointer;padding:.5rem 0' }, '졸업생 (' + alumni.length + '명)'),
+    h('ul', { class: 'col mt3', style: 'gap:.5rem' }, alumni.map((m) => {
+      const back = h('button', { type: 'button', class: 'btn ghost sm' }, '복귀');
+      back.onclick = () => restore(back, m);
+      return h('li', { class: 'card member' },
+        nameBlock(m, '졸업'),
+        statsList(m),
+        h('div', { class: 'row' }, back, h('button', { type: 'button', class: 'btn danger sm', onclick: () => deleteModal(m) }, '삭제')));
+    })));
+
   return h('div', { class: 'stack' },
     h('div', { class: 'between', style: 'margin-bottom:1rem' }, h('h1', { class: 'title', style: 'margin:0' }, '부원 관리'), h('button', { type: 'button', class: 'btn primary', onclick: () => memberModal() }, '+ 부원 추가')),
-    list);
+    list,
+    graduates);
 }
 
 show('home');
