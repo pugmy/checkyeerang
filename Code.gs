@@ -377,6 +377,7 @@ function api_addMember(d, token) {
   if (error) return result_(false, error);
   return locked_(function () {
     rosterRequireBaseline_();
+    rosterAssertConsistent_();
     var row = insert_(
       'User',
       { name: String(d.name).trim(), grade: Number(d.grade), day: Number(d.day), shift: Number(d.shift), workCount: 0, addCount: 0, runCount: 0, type: 1 },
@@ -393,6 +394,7 @@ function api_updateMember(id, d, token) {
   if (error) return result_(false, error);
   return locked_(function () {
     rosterRequireBaseline_();
+    rosterAssertConsistent_();
     var before = read_('User').filter(function (u) { return u.id === Number(id); })[0];
     var r = update_(
       'User',
@@ -413,6 +415,7 @@ function api_graduate(id, token) {
   requireAdmin_(token);
   return locked_(function () {
     rosterRequireBaseline_();
+    rosterAssertConsistent_();
     var before = read_('User').filter(function (u) { return u.id === Number(id); })[0];
     var r = update_('User', Number(id), { type: 0 });
     if (r === 'NOTFOUND') return result_(false, '존재하지 않는 부원입니다.');
@@ -425,6 +428,7 @@ function api_restore(id, token) {
   requireAdmin_(token);
   return locked_(function () {
     rosterRequireBaseline_();
+    rosterAssertConsistent_();
     var before = read_('User').filter(function (u) { return u.id === Number(id); })[0];
     var r = update_('User', Number(id), { type: 1 }, null, ['name', 'type']);
     if (r === 'DUP') return result_(false, '같은 이름의 재학생이 있어 복귀할 수 없습니다.');
@@ -458,6 +462,7 @@ function promoteYearly_() {
   locked_(function () {
     if (done()) return; // 락을 기다리는 사이 다른 실행이 끝냈을 수 있다
     rosterRequireBaseline_();
+    rosterAssertConsistent_();
     var users = read_('User');
     var previous = users.map(function (u) { return Object.assign({}, u); });
     var stamp = new Date().toISOString();
@@ -475,6 +480,7 @@ function promoteYearly_() {
 function api_deleteMember(id, token) {
   requireAdmin_(token);
   rosterRequireBaseline_();
+  rosterAssertConsistent_();
   id = Number(id);
   if (!Number.isSafeInteger(id) || id <= 0) return result_(false, '올바른 부원을 선택하세요.');
   return locked_(function () {
