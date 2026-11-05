@@ -450,9 +450,16 @@ function promoteYearly_() {
   if (done()) return;
   locked_(function () {
     if (done()) return; // 락을 기다리는 사이 다른 실행이 끝냈을 수 있다
+    rosterRequireBaseline_();
     var users = read_('User');
-    promote_(users, parseDate_(year + '-03-01').start.toISOString(), new Date().toISOString());
+    var previous = users.map(function (u) { return Object.assign({}, u); });
+    var stamp = new Date().toISOString();
+    promote_(users, parseDate_(year + '-03-01').start.toISOString(), stamp);
+    var changes = users.map(function (u, i) {
+      return { userId: u.id, patch: rosterPatch_(previous[i], u) };
+    }).filter(function (item) { return Object.keys(item.patch).length > 0; });
     writeAll_('User', users);
+    rosterWriteEvents_(changes, stamp);
     props.setProperty('PROMOTED_YEAR', String(year));
   });
 }
@@ -460,6 +467,7 @@ function promoteYearly_() {
 // 출석 이력이 있는 부원은 삭제하지 않는다. 졸업 처리로 기록을 보존한다.
 function api_deleteMember(id, token) {
   requireAdmin_(token);
+  rosterRequireBaseline_();
   id = Number(id);
   if (!Number.isSafeInteger(id) || id <= 0) return result_(false, '올바른 부원을 선택하세요.');
   return locked_(function () {
