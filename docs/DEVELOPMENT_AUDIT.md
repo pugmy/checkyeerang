@@ -63,3 +63,13 @@ Development branch: `15th-Gen-Kim-Woojun`.
 ## Release gate
 
 Changes here do **not** alter the deployed Apps Script version. School operators must review diffs, confirm Google Script deployment version, test on an independent test sheet, and explicitly promote tested changes.
+
+## 관리자 운영성 개선
+
+- 3월 자동 진급을 중단했다. **관리자 미리보기 → 대상 확인 → 확정** 절차를 통해서만 학년 변경 및 졸업생 전환을 실행한다.
+- 미리보기 이후 대상자의 ID 또는 기존 학년이 바뀐 경우 적용하지 않고 재확인을 요구한다. `PROMOTED_YEAR`로 같은 학년도 중복 실행을 막는다.
+- 신입생·부원 수정은 이름·학년·요일·시간을 다시 확인한 후 저장한다. 변경사항이 없으면 불필요한 쓰기를 막는다.
+- 졸업 처리 실패 시 성공한 것처럼 닫히던 관리 화면을 수정했다.
+- 명단 제외(`type=-1`)와 졸업(`type=0`)을 구분하고, 명단 제외 상태도 관리자 화면에서 복귀할 수 있다.
+- **새 관리자 변경은 별도 테스트 시트에서 검증해야 한다.** 운영본의 기존 학년도 진급 여부 및 `PROMOTED_YEAR` 값은 실제 배포 전에 담당자가 확인한다.
+
