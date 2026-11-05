@@ -482,7 +482,12 @@ function api_promotionPreview(token) {
     graduates: plan.filter(function (u) { return u.action === 'graduate'; }).length };
 }
 
-function api_applyPromotion(year, expectedIds, token) {
+function api_applyPromotion(year, expectedIds, decisions, token) {
+  // 기존 클라이언트의 3인자 호출을 유지한다.
+  if (token === undefined && typeof decisions === 'string') {
+    token = decisions;
+    decisions = null;
+  }
   requireAdmin_(token);
   year = Number(year);
   if (!Number.isSafeInteger(year) || promotionYear_() !== year) {
@@ -491,6 +496,15 @@ function api_applyPromotion(year, expectedIds, token) {
   if (!Array.isArray(expectedIds) || expectedIds.length > 500 ||
       expectedIds.some(function (id) { return typeof id !== 'string' || !/^[1-9]\d*:[123]$/.test(id); })) {
     return result_(false, '진급 대상 명단이 올바르지 않습니다.');
+  }
+  // 변경 대상은 미리보기 명단 안으로 제한한다. 같은 학생을 두 번 지정할 수 없다.
+  if (decisions != null && (!Array.isArray(decisions) || decisions.length > 500 ||
+      decisions.some(function (item) {
+        return !item || !Number.isSafeInteger(item.id) || item.id <= 0 ||
+          ['promote', 'graduate', 'exclude', 'keep'].indexOf(item.action) < 0;
+      }) ||
+      new Set(decisions.map(function (item) { return item.id; })).size !== decisions.length)) {
+    return result_(false, '학생별 처리 항목을 다시 확인하세요.');
   }
   return locked_(function () {
     var props = PropertiesService.getScriptProperties();
@@ -513,7 +527,28 @@ function api_applyPromotion(year, expectedIds, token) {
     if (!plan.length) return result_(false, '진급할 재학생이 없습니다.');
     var previous = users.map(function (u) { return Object.assign({}, u); });
     var stamp = new Date().toISOString();
-    promote_(users, parseDate_(year + '-03-01').start.toISOString(), stamp);
+    var allowed = {};
+    plan.forEach(function (m) { allowed[m.id] = m; });
+    var overrides = {};
+    (decisions || []).forEach(function (item) { overrides[item.id] = item.action; });
+    if (Object.keys(overrides).some(function (id) { return !allowed[id]; })) {
+      return result_(false, '진급 대상이 아닌 학생이 포함되어 있습니다. 명단을 다시 불러오세요.');
+    }
+    var invalid = plan.some(function (m) {
+      var action = overrides[m.id] || m.action;
+      return (action === 'promote' && m.fromGrade >= 3);
+    });
+    if (invalid) return result_(false, '3학년은 4학년으로 진급할 수 없습니다. 처리 항목을 다시 선택하세요.');
+    var byId = {};
+    users.forEach(function (u) { byId[u.id] = u; });
+    plan.forEach(function (m) {
+      var u = byId[m.id];
+      var action = overrides[m.id] || m.action;
+      if (action === 'promote') u.grade += 1;
+      else if (action === 'graduate') u.type = 0;
+      else if (action === 'exclude') u.type = -1;
+      if (action !== 'keep') u.updatedAt = stamp;
+    });
     var changes = users.map(function (u,i) {
       return { userId: u.id, patch: rosterPatch_(previous[i], u) };
     }).filter(function (x) { return Object.keys(x.patch).length > 0; });
