@@ -96,3 +96,35 @@ function rosterHistoryFor_(users, index, at) {
     return state || (!rosterCovered_(at) ? u : null);
   }).filter(function (u) { return u !== null; });
 }
+
+// 과거 날짜 조회는 시간대별 마감 직전의 배정 상태를 복원한다.
+// 같은 날 점심/저녁 사이에 시간표가 바뀌어도 각 당번의 이력이 유지된다.
+function rosterDayView_(date, users, records) {
+  var range = parseDate_(date);
+  var index = rosterIndex_();
+  var endOfDay = new Date(range.end.getTime() - 1).toISOString();
+  var historicalUsers = rosterHistoryFor_(users, index, endOfDay)
+    .filter(function (u) {
+      return u.type === 1 || records.some(function (r) { return r.userId === u.id; });
+    });
+  var slots = {};
+  [LUNCH, LUNCH_AFTER, DINNER].forEach(function (shift) {
+    var at = rosterAtDeadline_(date, shift);
+    slots[shift] = rosterHistoryFor_(users, index, at).filter(function (u) {
+      return u.type === 1 && u.day === range.day && u.shift === shift;
+    }).sort(byName_);
+  });
+  var verified = [LUNCH, LUNCH_AFTER, DINNER].every(function (shift) {
+    return rosterCovered_(rosterAtDeadline_(date, shift));
+  });
+  return { users: historicalUsers.sort(byName_), shifts: slots, verified: verified };
+}
+
+// CSV는 기록 날짜에 해당하는 시간대 마감 시점의 학년·담당 요일·시간을 출력한다.
+function rosterForRecord_(index, record, fallback) {
+  var at = record.shift && DEADLINE_MINUTE[record.shift]
+    ? rosterAtDeadline_(record.date, record.shift)
+    : new Date(parseDate_(record.date).end.getTime() - 1).toISOString();
+  var historical = rosterStateAt_(index, record.userId, at);
+  return { user: historical || fallback, verified: rosterCovered_(at) && !!historical };
+}
