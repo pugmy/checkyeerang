@@ -39,6 +39,9 @@ function fixture() {
     },
     exemption_: () => ({ all: false, grades: { 1: false, 2: false, 3: false }, reasons: [] }),
     isExempt_: (rule, grade) => !!rule.all || !!rule.grades?.[grade],
+    rosterIndex_: () => ({}),
+    rosterAtDeadline_: date => new Date(date + 'T13:00:00+09:00').toISOString(),
+    rosterStateAt_: () => null,
   };
   const ctx = vm.createContext(env);
   vm.runInContext(source, ctx);
