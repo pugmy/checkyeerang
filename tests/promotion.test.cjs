@@ -41,6 +41,7 @@ function harness() {
   context.PropertiesService = { getScriptProperties: () => ({
     getProperty: key => props[key] || null,
     setProperty: (key, value) => { props[key] = value; },
+    deleteProperty: key => { delete props[key]; },
   }) };
   return { context, users: () => users, records, props };
 }
@@ -86,4 +87,29 @@ test("unauthenticated clients cannot preview or apply promotion", () => {
   const h = harness();
   assert.throws(() => h.context.api_promotionPreview(), /관리자/);
   assert.throws(() => h.context.api_applyPromotion(YEAR, ["1:2", "2:3"]), /관리자/);
+});
+
+test("unknown outcome of prior promotion blocks automatic retry", () => {
+  const h = harness();
+  h.props.PROMOTION_PENDING_YEAR = String(YEAR);
+  const preview = h.context.api_promotionPreview("valid-admin");
+  assert.equal(preview.reviewRequired, true);
+  assert.equal(preview.members.length, 0);
+  assert.equal(h.context.api_applyPromotion(YEAR, ["1:2", "2:3"], "valid-admin").ok, false);
+  assert.equal(h.records.length, 0);
+});
+
+test("successful promotion clears the pending marker", () => {
+  const h = harness();
+  assert.equal(h.context.api_applyPromotion(YEAR, ["1:2", "2:3"], "valid-admin").ok, true);
+  assert.equal(h.props.PROMOTION_PENDING_YEAR, undefined);
+  assert.equal(h.props.PROMOTED_YEAR, String(YEAR));
+});
+
+test("history write failure leaves review marker to prevent accidental repeat", () => {
+  const h = harness();
+  h.context.rosterPromoteOrRollback_ = () => { throw new Error("sheet write failure"); };
+  assert.throws(() => h.context.api_applyPromotion(YEAR, ["1:2", "2:3"], "valid-admin"), /sheet write failure/);
+  assert.equal(h.props.PROMOTION_PENDING_YEAR, String(YEAR));
+  assert.equal(h.context.api_applyPromotion(YEAR, ["1:2", "2:3"], "valid-admin").ok, false);
 });
