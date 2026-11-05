@@ -540,6 +540,29 @@ function csvModal(today) {
   });
 }
 
+// 시간표 이력을 수정하지 않는 읽기 전용 점검.
+async function inspectRoster() {
+  openModal({ label: '시간표 이력 점검' }, (box, close) => {
+    const message = h('p', { class: 'muted', role: 'status' }, '현재 시간표와 변경 기록을 확인하고 있습니다.');
+    box.append(h('h2', {}, '시간표 이력 점검'), message,
+      h('div', { class: 'actions' }, h('button', { type: 'button', class: 'btn ghost', onclick: close }, '닫기')));
+    adminApi('api_rosterAudit').then((result) => {
+      message.textContent = result.ok
+        ? '문제가 발견되지 않았습니다. 부원 ' + result.members + '명, 변경 기록 ' + result.events + '건을 확인했습니다.'
+        : '확인이 필요한 항목 ' + result.errors.length + '건이 있습니다.';
+      message.className = 'msg ' + (result.ok ? 'ok-text' : 'bad-text');
+      if (!result.ok) {
+        box.append(h('ul', { class: 'col mt3' }, result.errors.slice(0, 30).map((error) =>
+          h('li', { class: 'detail' }, error.code + ' · 부원 ID ' + (error.userId || '-') +
+            (error.id ? ' · 기록 ID ' + error.id : ''))));
+        if (result.errors.length > 30) box.append(h('p', { class: 'muted' }, '나머지 항목은 원본 시트에서 확인해 주세요.'));
+      }
+    }).catch((error) => {
+      message.className = 'msg bad-text';
+      message.textContent = errText(error);
+    });
+  });
+}
 // ---------- 부원관리 ----------
 function memberModal(member) {
   openModal({ label: member ? '부원 수정' : '부원 추가' }, (box, close) => {
@@ -656,7 +679,9 @@ async function renderMember() {
     })));
 
   return h('div', { class: 'stack' },
-    h('div', { class: 'between', style: 'margin-bottom:1rem' }, h('h1', { class: 'title', style: 'margin:0' }, '부원 관리'), h('div', { class: 'row' }, logoutControl(), h('button', { type: 'button', class: 'btn primary', onclick: () => memberModal() }, '+ 부원 추가'))),
+    h('div', { class: 'between', style: 'margin-bottom:1rem' }, h('h1', { class: 'title', style: 'margin:0' }, '부원 관리'), h('div', { class: 'row wrap' }, logoutControl(),
+      h('button', { type: 'button', class: 'btn ghost sm', onclick: inspectRoster }, '이력 점검'),
+      h('button', { type: 'button', class: 'btn primary', onclick: () => memberModal() }, '+ 부원 추가'))),
     list,
     graduates);
 }
