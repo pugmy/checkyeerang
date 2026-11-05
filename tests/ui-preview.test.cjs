@@ -30,7 +30,8 @@ test("offline preview uses actual project markup, real logo and synthetic record
   assert.ok(generated);
   assert.equal(destination, path.join(root, "preview-ui.html"));
   assert.match(generated, /data:image\/png;base64/);
-  assert.match(generated, /LOCAL PREVIEW/);
+  assert.match(generated, /화면 테스트/);
+  assert.match(generated, /가상 데이터 · 실제 서버 연결 없음/);
   assert.match(generated, /api_home: \(\)/);
   assert.doesNotMatch(generated, /<\?!=/);
   assert.match(generated, /SUIT-Variable\.css/);
