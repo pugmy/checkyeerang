@@ -91,3 +91,17 @@ test("student home uses a centered layout independently of administrator pages",
   assert.match(stylesheet, /\.member-roster \{display:grid;/);
   assert.doesNotMatch(stylesheet, /main\s*\{[^}]*max-width:52rem/);
 });
+
+test("annual roster review has per-student choices and plain-language exception help", () => {
+  const html = fs.readFileSync(htmlPath, "utf8");
+  const client = html.match(/<script>([\s\S]*?)<\/script>\s*<\/body>/)?.[1] || "";
+  assert.match(client, /학년도 명단 정리/);
+  assert.match(client, /조기졸업·명단 제외·진급 유예/);
+  assert.match(client, /optionsFor\(m\)/);
+  assert.match(client, /'현 상태 유지'/);
+  assert.match(client, /'진급 → ' \+ \(m\.fromGrade \+ 1\) \+ '학년'/);
+  assert.match(client, /selected\.set\(m\.id, choose\.value\)/);
+  assert.match(client, /confirm\.checked = false/);
+  assert.match(client, /adminApi\('api_applyPromotion', preview\.year, expected, decisions\)/);
+  assert.match(html, /\.modal\.promotion-dialog \{max-width:38rem;/);
+});
