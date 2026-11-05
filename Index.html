@@ -554,7 +554,7 @@ async function inspectRoster() {
       if (!result.ok) {
         box.append(h('ul', { class: 'col mt3' }, result.errors.slice(0, 30).map((error) =>
           h('li', { class: 'detail' }, error.code + ' · 부원 ID ' + (error.userId || '-') +
-            (error.id ? ' · 기록 ID ' + error.id : ''))));
+            (error.id ? ' · 기록 ID ' + error.id : '')))));
         if (result.errors.length > 30) box.append(h('p', { class: 'muted' }, '나머지 항목은 원본 시트에서 확인해 주세요.'));
       }
     }).catch((error) => {
