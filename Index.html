@@ -590,6 +590,12 @@ async function openPromotion() {
         content.replaceChildren(h('p', {}, preview.year + '학년도 진급은 이미 처리되었습니다.'));
         return;
       }
+      if (preview.reviewRequired) {
+        content.replaceChildren(
+          h('p', { class: 'bad-text bold' }, '이전 진급 작업의 결과를 확인해야 합니다.'),
+          h('p', { class: 'muted' }, '중복 진급을 막기 위해 자동 재실행을 차단했습니다. 이력 점검과 원본 시트 확인 후 담당자가 처리해 주세요.'));
+        return;
+      }
       const list = h('ul', { class: 'col' },
         preview.members.map((m) => h('li', { class: 'detail' },
           m.name + ' · ' + m.fromGrade + '학년 → ' +
