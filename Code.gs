@@ -437,9 +437,17 @@ function promoteYearly() {
 
 // 출석/보충/결석 기록이 부원을 참조하므로 함께 지운다
 function api_deleteMember(id) {
+  id = Number(id);
+  if (!Number.isSafeInteger(id) || id <= 0) return result_(false, '올바른 부원을 선택하세요.');
   return locked_(function () {
-    delete_('choolsuck', 'userId', Number(id));
-    delete_('User', 'id', Number(id));
+    var exists = read_('User').some(function (u) { return u.id === id; });
+    if (!exists) return result_(false, '존재하지 않는 부원입니다.');
+    // 출석 이력은 감사 자료이므로 영구 삭제하지 않는다.
+    var hasHistory = read_('choolsuck').some(function (r) { return r.userId === id; });
+    if (hasHistory) {
+      return result_(false, '출석 기록이 있는 부원은 삭제할 수 없습니다. 졸업 처리로 기록을 보존하세요.');
+    }
+    delete_('User', 'id', id);
     return result_(true, '삭제되었습니다.');
   });
 }
