@@ -771,9 +771,12 @@ async function openPromotion() {
         return;
       }
 
-      const options = [
-        ['promote', '진급'], ['graduate', '졸업'], ['exclude', '명단 제외'], ['keep', '현 상태 유지']
-      ];
+      const optionsFor = (m) => [
+        ['promote', '진급 → ' + (m.fromGrade + 1) + '학년'],
+        ['graduate', '졸업 처리'],
+        ['exclude', '명단 제외'],
+        ['keep', '현 상태 유지']
+      ].filter(([action]) => action !== 'promote' || m.fromGrade < 3);
       const selected = new Map();
       const summary = h('p', { class: 'promotion-summary', role: 'status', 'aria-live': 'polite' });
       const confirm = h('input', { type: 'checkbox', 'aria-label': '명단 정리 내용 확인' });
@@ -792,8 +795,7 @@ async function openPromotion() {
         preview.members.map((m) => {
           const choose = h('select', {
             class: 'field promotion-select', 'aria-label': m.name + ' 처리 방법'
-          }, options.filter(([action]) => action !== 'promote' || m.fromGrade < 3)
-            .map(([value, label]) => h('option', { value }, label)));
+          }, optionsFor(m).map(([value, label]) => h('option', { value }, label)));
           choose.value = m.action;
           selected.set(m.id, m.action);
           choose.addEventListener('change', () => {
@@ -829,9 +831,9 @@ async function openPromotion() {
       recalc();
       content.replaceChildren(
         h('p', { class: 'muted' }, preview.year + '학년도 · 기존 재학생 ' + preview.members.length + '명'),
-        h('p', {}, '학생별 처리 방법을 확인하고, 필요한 항목만 바꿔 주세요.'),
+        h('p', {}, '학생별 처리 방법을 확인해 주세요.'),
         h('p', { class: 'muted' },
-          '신입생은 ‘부원 추가’에서 등록하고, 기존 졸업생은 ‘졸업생’ 목록에서 관리할 수 있습니다.'),
+          '조기졸업·명단 제외·진급 유예는 아래에서 선택하고, 신입생 등록이나 기존 졸업생 관리는 부원 관리에서 처리해 주세요.'),
         list, summary,
         h('label', { class: 'row wrap promotion-confirm' }, confirm, '위 내용을 확인했습니다.'),
         status, apply);
