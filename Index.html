@@ -218,6 +218,30 @@ h2.sub {font-size:1.07rem;font-weight:700;}
 .stats dd {font-weight:730;}
 .choice {font-weight:650;}
 .detail {border-radius:.3rem;}
+/* 관리자 주간 시간표 — 행은 시간대, 열은 요일. 버튼을 통해 직접 수정 */
+.schedule-section {margin:1.25rem 0 1.8rem;}
+.schedule-heading {margin-bottom:.85rem;}
+.schedule-heading h2 {margin:0 0 .3rem;}
+.schedule-scroll {overflow-x:auto;max-width:100%;border:1px solid var(--line);
+  border-radius:.65rem;background:var(--surface);overscroll-behavior-x:contain;}
+.schedule-scroll:focus-visible {outline:3px solid var(--brand);outline-offset:2px;}
+.schedule-table {border-collapse:collapse;table-layout:fixed;width:100%;min-width:650px;}
+.schedule-table th,.schedule-table td {border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:.65rem;vertical-align:top;}
+.schedule-table tr:last-child > * {border-bottom:none;}
+.schedule-table tr > *:last-child {border-right:none;}
+.schedule-table thead th {text-align:center;font-size:.92rem;background:var(--idle-soft);font-weight:700;}
+.schedule-table tbody th {width:8.5rem;font-weight:700;text-align:left;background:var(--idle-soft);}
+.schedule-time {display:block;font-weight:400;color:var(--muted);font-size:.72rem;margin-top:.25rem;white-space:nowrap;}
+.schedule-cell {width:calc((100% - 8.5rem)/5);text-align:center;min-height:4rem;}
+.schedule-person {display:flex;flex-direction:column;align-items:center;gap:.15rem;
+  width:100%;min-height:2.75rem;padding:.45rem .3rem;margin-bottom:.35rem;border:1px solid var(--line);
+  border-radius:.4rem;color:var(--ink);background:var(--surface);font:inherit;font-weight:650;cursor:pointer;}
+.schedule-person:last-child {margin-bottom:0;}
+.schedule-person:hover {border-color:var(--brand);background:var(--brand-soft);}
+.schedule-person:focus-visible {outline:3px solid var(--brand);outline-offset:2px;}
+.schedule-person small {color:var(--muted);font-size:.73rem;font-weight:500;}
+.schedule-empty {display:block;color:var(--muted);text-align:center;padding:.8rem 0;}
+.schedule-section[hidden] {display:none;}
 /* 학년도 정리: 학생별 처리 결과를 눈으로 비교할 수 있는 행 */
 .modal.promotion-dialog {max-width:38rem;}
 .promotion-list {display:flex;flex-direction:column;gap:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
@@ -966,6 +990,44 @@ async function renderMember() {
     '재학생 ' + members.length + '명 · ' +
     [1, 2, 3].map(g => g + '학년 ' + members.filter(m => m.grade === g).length + '명').join(' · '));
 
+  // 현재 당번을 한눈에 확인하는 5일 × 3시간대 시간표. 이름을 누르면 기존 수정 창을 연다.
+  const scheduleShifts = [1, 3, 2];
+  const scheduleTable = h('table', { class: 'schedule-table', 'aria-label': '도서부 주간 당번 시간표' },
+    h('thead', {}, h('tr', {},
+      h('th', { scope: 'col' }, '시간'),
+      DAYS.map(day => h('th', { scope: 'col' }, day + '요일')))),
+    h('tbody', {}, scheduleShifts.map(shift =>
+      h('tr', {},
+        h('th', { scope: 'row' },
+          h('span', {}, SHIFT[shift]),
+          h('small', { class: 'schedule-time' }, TIME[shift])),
+        DAYS.map((day, index) => {
+          const assigned = members.filter(m => m.day === index + 1 && m.shift === shift);
+          return h('td', { class: 'schedule-cell' },
+            assigned.length ? assigned.map(m => h('button', {
+              type: 'button', class: 'schedule-person',
+              'aria-label': m.name + ' · ' + day + '요일 ' + SHIFT[shift] + ' 당번 수정',
+              onclick: () => memberModal(m)
+            }, m.name, h('small', {}, m.grade + '학년')))
+            : h('span', { class: 'schedule-empty' }, '—'));
+        })))));
+  const scheduleSection = h('section', { class: 'schedule-section', 'aria-labelledby': 'schedule-heading' },
+    h('div', { class: 'between schedule-heading' },
+      h('div', {},
+        h('h2', { id: 'schedule-heading', class: 'sub' }, '주간 당번 시간표'),
+        h('p', { class: 'muted' }, '이름을 누르면 요일과 당번 시간을 바로 수정할 수 있습니다.'))),
+    h('div', { class: 'schedule-scroll', tabindex: '0', role: 'region',
+      'aria-label': '주간 당번 시간표, 가로 스크롤 가능' }, scheduleTable));
+  const scheduleToggle = h('button', { type: 'button', class: 'btn ghost sm',
+    'aria-expanded': 'true', 'aria-controls': 'schedule-board' }, '시간표 접기');
+  scheduleSection.id = 'schedule-board';
+  scheduleToggle.addEventListener('click', () => {
+    const visible = !scheduleSection.hidden;
+    scheduleSection.hidden = visible;
+    scheduleToggle.setAttribute('aria-expanded', String(!visible));
+    scheduleToggle.textContent = visible ? '시간표 펼치기' : '시간표 접기';
+  });
+
   const list = members.length === 0
     ? h('div', { class: 'card big' }, h('p', { class: 'bold' }, '등록된 부원이 없습니다.'), h('p', { class: 'muted', style: 'font-size:.9rem' }, '오른쪽 위 “부원 추가”로 시작해 보세요.'))
     : h('ul', { class: 'member-roster' }, members.map((m) =>
@@ -1019,10 +1081,12 @@ async function renderMember() {
 
   return h('div', { class: 'stack' },
     h('div', { class: 'between', style: 'margin-bottom:1rem' }, h('h1', { class: 'title', style: 'margin:0' }, '부원 관리'), h('div', { class: 'row wrap' }, logoutControl(),
+      scheduleToggle,
       h('button', { type: 'button', class: 'btn ghost sm', onclick: inspectRoster }, '이력 점검'),
       h('button', { type: 'button', class: 'btn ghost sm', onclick: openPromotion }, '학년도 정리'),
       h('button', { type: 'button', class: 'btn primary', onclick: () => memberModal() }, '+ 부원 추가'))),
     overview,
+    scheduleSection,
     search,
     searchCount,
     list,
