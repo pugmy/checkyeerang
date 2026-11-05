@@ -787,7 +787,7 @@ async function renderMember() {
     let visible = 0;
     Array.from(list.querySelectorAll('li')).forEach((item, i) => {
       const matches = members[i].name.toLocaleLowerCase('ko-KR').includes(query);
-      item.hidden = !matches;
+      item.style.display = matches ? '' : 'none';
       if (matches) visible++;
     });
     searchCount.textContent = query ? '검색 결과 ' + visible + '명' : '';
