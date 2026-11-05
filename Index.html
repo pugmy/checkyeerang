@@ -510,9 +510,12 @@ function deleteModal(m) {
     del.onclick = async () => {
       pending = true;
       cancel.disabled = true;
-      try { await busy(del, '삭제 중...', () => api('api_deleteMember', m.id)); }
-      catch (e) { alert(errText(e)); }
+      let result;
+      try { result = await busy(del, '삭제 중...', () => api('api_deleteMember', m.id)); }
+      catch (e) { result = { ok: false, message: errText(e) }; }
       pending = false;
+      cancel.disabled = false;
+      if (!result.ok) { alert(result.message); return; }
       close();
       show('member');
     };
