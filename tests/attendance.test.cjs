@@ -30,6 +30,8 @@ function harness(data) {
     formatDate: (_d, _tz, pattern) => pattern === "u" ? "1" : pattern === "H" ? "13" : "00",
   };
   context.formatKST_ = d => d.toISOString();
+  context.rosterIndex_ = () => ({});
+  context.rosterForRecord_ = (_index, record, fallback) => ({ user: fallback, verified: false });
   return { context, rows };
 }
 
