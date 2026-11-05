@@ -51,5 +51,5 @@ test("UI has labeled navigation, keyboard focus and reduced-motion handling", ()
   assert.match(html, /prefers-reduced-motion: reduce/);
   assert.match(html, /font-family: "SUIT Variable"/);
   assert.match(html, /<main id="main"><\/main>/);
-  assert.match(html, /<footer>개발 : 16기 안준표<\/footer>/);
+  assert.match(html, /<footer>개발 · 15기 김우준 · 16기 안준표<\/footer>/);
 });
