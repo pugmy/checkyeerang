@@ -14,6 +14,18 @@ Google Apps Script 웹앱입니다. 화면(`Index.html`), 서버 로직(`Code.gs
 - 부원 명단에서 제외할 때도 과거 시간표를 보존한다.
 - 운영용 `main` 또는 실제 Apps Script 배포와는 별개이며, 개발용 시트에서 마이그레이션과 테스트를 확인해야 한다.
 
+## UI 2.0 미리보기
+
+개발 컴퓨터에서 가상 데이터로 화면을 확인할 수 있습니다. 아래 명령어는 실제 학교 Google Sheets나 운영용 Apps Script를 변경하지 않습니다.
+
+```powershell
+node --test
+node scripts/build-ui-preview.cjs
+start preview-ui.html
+```
+
+미리보기는 현재 `Index.html`과 기존 학교 로고로 구성됩니다. 설정과 검증 항목은 [디자인 가이드](docs/UI_DESIGN_2.md)를 참고하세요.
+
 ## 처음 설정
 
 1. `clasp push -f`로 올립니다. (`.clasp.json`의 `scriptId`는 직접 만들어야 합니다: `clasp create` 또는 `clasp clone <scriptId>`)
