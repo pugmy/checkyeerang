@@ -357,7 +357,7 @@ function api_admin(date, token) {
 
 function api_members(token) {
   requireAdmin_(token);
-  return read_('User').sort(function (a, b) {
+  return read_('User').filter(function (u) { return u.type !== -1; }).sort(function (a, b) {
     return a.day - b.day || SHIFT_ORDER[a.shift] - SHIFT_ORDER[b.shift] || byName_(a, b);
   });
 }
@@ -478,15 +478,17 @@ function api_deleteMember(id, token) {
   id = Number(id);
   if (!Number.isSafeInteger(id) || id <= 0) return result_(false, '올바른 부원을 선택하세요.');
   return locked_(function () {
-    var exists = read_('User').some(function (u) { return u.id === id; });
-    if (!exists) return result_(false, '존재하지 않는 부원입니다.');
-    // 출석 이력은 감사 자료이므로 영구 삭제하지 않는다.
+    var member = read_('User').filter(function (u) { return u.id === id && u.type !== -1; })[0];
+    if (!member) return result_(false, '존재하지 않는 부원입니다.');
+    // 부원 행을 실제로 삭제하지 않아야 과거 배정과 감사 이력을 복원할 수 있다.
     var hasHistory = read_('choolsuck').some(function (r) { return r.userId === id; });
     if (hasHistory) {
       return result_(false, '출석 기록이 있는 부원은 삭제할 수 없습니다. 졸업 처리로 기록을 보존하세요.');
     }
-    delete_('User', 'id', id);
-    return result_(true, '삭제되었습니다.');
+    var updated = update_('User', id, { type: -1 });
+    if (updated === 'NOTFOUND') return result_(false, '존재하지 않는 부원입니다.');
+    rosterLog_(id, member, updated);
+    return result_(true, '부원 목록에서 제외되었습니다.');
   });
 }
 
