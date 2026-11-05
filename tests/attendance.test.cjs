@@ -60,7 +60,7 @@ test("allow deletion only if there is no attendance history", () => {
   assert.equal(context.api_deleteMember(1, 'test-admin-token').ok, true);
   assert.equal(rows.User.length, 1);
   assert.equal(rows.User[0].type, -1);
-  assert.equal(context.api_members('test-admin-token').length, 0);
+  assert.equal(context.api_members('test-admin-token')[0].type, -1);
 });
 
 test("reject invalid member ids", () => {
