@@ -540,6 +540,18 @@ function csvModal(today) {
   });
 }
 
+const ROSTER_AUDIT_LABEL = {
+  MISSING_BASELINE: '시간표 기준 기록이 없습니다',
+  INVALID_USER_ID: '부원 식별자가 올바르지 않습니다',
+  INVALID_EVENT: '시간표 변경 기록의 형식이 잘못됐습니다',
+  DUPLICATE_EVENT_ID: '변경 기록 번호가 중복됩니다',
+  INVALID_PATCH: '시간표 변경 내용이 올바르지 않습니다',
+  ORPHAN_EVENT: '존재하지 않는 부원을 참조하는 기록입니다',
+  MISSING_HISTORY: '부원의 최초 시간표 기록이 없습니다',
+  BEFORE_BASELINE: '기준 시점보다 이전의 변경 기록입니다',
+  FUTURE_EVENT: '미래 시각의 변경 기록입니다',
+  CURRENT_MISMATCH: '현재 시간표와 변경 기록이 일치하지 않습니다',
+};
 // 시간표 이력을 수정하지 않는 읽기 전용 점검.
 async function inspectRoster() {
   openModal({ label: '시간표 이력 점검' }, (box, close) => {
@@ -553,7 +565,7 @@ async function inspectRoster() {
       message.className = 'msg ' + (result.ok ? 'ok-text' : 'bad-text');
       if (!result.ok) {
         box.append(h('ul', { class: 'col mt3' }, result.errors.slice(0, 30).map((error) =>
-          h('li', { class: 'detail' }, error.code + ' · 부원 ID ' + (error.userId || '-') +
+          h('li', { class: 'detail' }, (ROSTER_AUDIT_LABEL[error.code] || '시간표 이력을 확인해 주세요') + ' · 부원 ID ' + (error.userId || '-') +
             (error.id ? ' · 기록 ID ' + error.id : '')))));
         if (result.errors.length > 30) box.append(h('p', { class: 'muted' }, '나머지 항목은 원본 시트에서 확인해 주세요.'));
       }
