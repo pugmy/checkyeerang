@@ -545,7 +545,10 @@ function makeupSection(d) {
 
 async function renderHome() {
   const d = await api('api_home');
-  const fmt = (o) => new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', ...o });
+  // 표시 날짜도 서버의 출석 기준일을 사용한다. 공용 PC의 잘못된 시계에 영향을 받지 않는다.
+  const displayDate = /^\d{4}-\d{2}-\d{2}$/.test(d.today || '')
+    ? new Date(d.today + 'T12:00:00+09:00') : new Date();
+  const fmt = (o) => displayDate.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', ...o });
 
   let duty;
   if (!d.current) {
