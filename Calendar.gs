@@ -20,9 +20,10 @@ function calendarDateAt_(range, i) {
   return calendarDate_(new Date(range.begin.getTime() + i * 86400000));
 }
 
-function calendarBuildMonth_(month, users, events, records, notes, baseline) {
+function calendarBuildMonth_(month, users, events, records, notes, baseline, schoolRules) {
   var range = calendarMonthRange_(month);
   if (!range) throw new Error('달력 월을 확인해 주세요.');
+  schoolRules = schoolRules || [];
   var history = events.slice().sort(function (a, b) {
     return a.effectiveAt < b.effectiveAt ? -1 :
       a.effectiveAt > b.effectiveAt ? 1 : a.id - b.id;
@@ -75,9 +76,11 @@ function calendarBuildMonth_(month, users, events, records, notes, baseline) {
       return { id: n.id, category: n.category, title: n.title, detail: n.detail,
         userId: n.userId, name: person ? person.name : '' };
     });
+    var school = schoolRuleExemption_(date, schoolRules);
     days.push({ date: date, inMonth: date.slice(0, 7) === month,
       verified: !!baseline && rosterAtDeadline_(date, DINNER) >= baseline,
-      slots: slots, records: dayRecords, notes: dayNotes });
+      slots: slots, records: dayRecords, notes: dayNotes, school: school,
+      needsReview: school.all && dayRecords.some(function (r) { return r.kind === 'absent'; }) });
   }
   return { ok: true, month: month, days: days };
 }
@@ -90,7 +93,8 @@ function api_calendarMonth(month, token) {
   var from = calendarDateAt_(first, 0), to = calendarDateAt_(first, 41);
   var records = read_('choolsuck').filter(function (r) { return r.date >= from && r.date <= to; });
   var notes = read_('CalendarNotes').filter(function (r) { return r.date >= from && r.date <= to; });
-  return calendarBuildMonth_(month, read_('User'), read_('RosterHistory'), records, notes, baseline);
+  return calendarBuildMonth_(month, read_('User'), read_('RosterHistory'), records, notes,
+    baseline, read_('SchoolDays'));
 }
 
 function calendarValidateNote_(data) {
