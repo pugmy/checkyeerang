@@ -15,8 +15,9 @@ var SCHEMA = {
   choolsuck: ['id', 'userId', 'day', 'shift', 'kind', 'date', 'detail', 'createdAt', 'updatedAt'],
   RosterHistory: ['id', 'userId', 'effectiveAt', 'patch', 'createdAt'],
   CalendarNotes: ['id', 'date', 'category', 'title', 'detail', 'userId', 'createdAt', 'updatedAt'],
+  SchoolDays: ['id', 'startDate', 'endDate', 'category', 'title', 'supersedesId', 'cancelled', 'createdAt', 'updatedAt'],
 };
-var TEXT_COLS = ['name', 'kind', 'date', 'detail', 'createdAt', 'updatedAt', 'effectiveAt', 'patch', 'category', 'title'];
+var TEXT_COLS = ['name', 'kind', 'date', 'detail', 'createdAt', 'updatedAt', 'effectiveAt', 'patch', 'category', 'title', 'startDate', 'endDate'];
 
 // ---------- 진입점 / 설치 ----------
 
