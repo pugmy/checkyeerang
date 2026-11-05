@@ -1339,7 +1339,11 @@ async function renderMember() {
     h('div', { class: 'between schedule-heading' },
       h('div', {},
         h('h2', { id: 'schedule-heading', class: 'sub' }, '주간 당번 시간표'),
-        h('p', { class: 'muted' }, '이름을 누르면 요일과 당번 시간을 바로 수정할 수 있습니다.'))),
+        h('p', { class: 'muted' }, '이름을 누르면 요일과 당번 시간을 바로 수정할 수 있습니다.')),
+      h('button', { type: 'button', class: 'btn ghost sm',
+        onclick: async () => {
+          try { await schoolRulesModal(); } catch (e) { alert(errText(e)); }
+        } }, '시험·휴업일 설정')),
     h('div', { class: 'schedule-scroll', tabindex: '0', role: 'region',
       'aria-label': '주간 당번 시간표, 가로 스크롤 가능' }, scheduleTable));
   const scheduleToggle = h('button', { type: 'button', class: 'btn ghost sm',
