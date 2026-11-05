@@ -202,7 +202,7 @@ function recordAbsencesToday_() {
   // 학사일정을 못 읽으면 면제 여부를 모르므로 잘못된 결석을 남기지 않게 이번에는 건너뛴다(다음 실행에서 다시 시도)
   var exempt;
   try {
-    exempt = exemption_(date);
+    exempt = schoolExemption_(date);
   } catch (e) {
     Logger.log('학사일정 조회 실패로 결석 기록을 건너뜁니다: ' + e.message);
     return;
@@ -249,16 +249,23 @@ function api_home() {
   var date = today_();
   var current = currentShift_();
   var users = read_('User').filter(function (u) { return u.type === 1; });
-
-  var duty = [];
-  if (current) {
-    var attended = {};
-    read_('choolsuck').forEach(function (r) {
-      if (r.date === date && r.kind === 'duty') attended[r.userId] = true;
-    });
-    duty = users
-      .filter(function (u) { return u.day === current.day && u.shift === current.shift; })
-      .map(function (u) { return { id: u.id, name: u.name, attended: !!attended[u.id] }; });
+  var attendance = {};
+  read_('choolsuck').forEach(function (r) {
+    if (r.date === date && r.kind === 'duty') attendance[r.userId] = true;
+  });
+  var weekday = parseDate_(date).day;
+  var slots = [LUNCH, LUNCH_AFTER, DINNER].map(function (shift) {
+    var candidates = users.filter(function (u) { return u.day === weekday && u.shift === shift; });
+    return { shift: shift, duty: candidates.map(function (u) {
+      return { id: u.id, name: u.name, attended: !!attendance[u.id] };
+    }) };
+  });
+  var duty = current ? slots.filter(function (slot) { return slot.shift === current.shift; })[0].duty : [];
+  var exemption = { all: false, reasons: [], unknown: false };
+  try {
+    exemption = schoolExemption_(date);
+  } catch (e) {
+    exemption.unknown = true;
   }
 
   var makeup = users.slice().sort(byName_).map(function (u) {
@@ -269,7 +276,7 @@ function api_home() {
       onDuty: !!current && u.day === current.day && u.shift === current.shift,
     };
   });
-  return { today: date, current: current, duty: duty, makeup: makeup };
+  return { today: date, current: current, duty: duty, slots: slots, exemption: exemption, makeup: makeup };
 }
 
 function api_attend(userId, detail) {
@@ -278,6 +285,8 @@ function api_attend(userId, detail) {
   // 클라이언트 값은 믿지 않고, 서버에서 현재 당번 시간대와 해당 부원인지 다시 검증
   var current = currentShift_();
   if (!current) return result_(false, '지금은 당번 시간이 아닙니다.');
+  var day = today_();
+  if (schoolRuleEffective_(day).all) return result_(false, '오늘은 출석 의무가 없는 기간입니다.');
 
   return locked_(function () {
     var member = read_('User').filter(function (u) {
@@ -309,6 +318,9 @@ function api_makeup(userId, detail) {
   var date = today_();
   var today = parseDate_(date);
   if (!today.day) return result_(false, '주말에는 보충할 수 없습니다.');
+  if (schoolRuleEffective_(date).reasons.some(function (r) { return r.category === 'closed'; })) {
+    return result_(false, '휴업일에는 보충 출석을 기록할 수 없습니다.');
+  }
 
   return locked_(function () {
     var member = read_('User').filter(function (u) { return u.type === 1 && u.id === userId; })[0];
@@ -346,7 +358,7 @@ function api_admin(date, token) {
     .sort(function (a, b) { return a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0; });
   var exempt = null;
   try {
-    exempt = exemption_(date);
+    exempt = schoolExemption_(date);
   } catch (e) {} // 학사일정을 못 읽어도 출석 화면은 보여 준다(면제 표시만 빠진다)
   var view = rosterDayView_(date, read_('User'), records);
   return {
