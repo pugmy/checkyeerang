@@ -84,8 +84,11 @@ test("all administrative server endpoints call authorization first", () => {
     "api_deleteMember", "api_graduate", "api_restore", "api_csv",
     "api_promotionPreview", "api_applyPromotion", "api_rosterAudit"]) {
     const moduleSource = name === "api_rosterAudit" ? audit : code;
-    assert.match(moduleSource, new RegExp("function\\s+" + name +
-      "\\s*\\([^)]*\\)\\s*\\{\\s*requireAdmin_\\(token\\)"));
+    const guard = name === "api_applyPromotion"
+      ? /function api_applyPromotion\([^)]*\)\s*\{[\s\S]*?requireAdmin_\(token\)/
+      : new RegExp("function\\s+" + name +
+          "\\s*\\([^)]*\\)\\s*\\{\\s*requireAdmin_\\(token\\)");
+    assert.match(moduleSource, guard);
   }
 });
 
