@@ -210,6 +210,7 @@ function recordAbsencesToday_() {
   }
 
   locked_(function () {
+    if (schoolRuleEffective_(date).all) return;
     var users = read_('User');
     var byId = {};
     users.forEach(function (u) { byId[u.id] = u; });
@@ -255,8 +256,11 @@ function api_home() {
     if (r.date === date && r.kind === 'duty') attendance[r.userId] = true;
   });
   var weekday = parseDate_(date).day;
+  var allUsers = read_('User');
+  var rosterHistory = rosterIndex_();
   var slots = [LUNCH, LUNCH_AFTER, DINNER].map(function (shift) {
-    var candidates = users.filter(function (u) { return u.day === weekday && u.shift === shift; });
+    var candidates = rosterHistoryFor_(allUsers, rosterHistory, rosterAtDeadline_(date, shift))
+      .filter(function (u) { return u.type === 1 && u.day === weekday && u.shift === shift; });
     return { shift: shift, duty: candidates.map(function (u) {
       return { id: u.id, name: u.name, attended: !!attendance[u.id] };
     }) };
@@ -293,6 +297,7 @@ function api_attend(userId, detail) {
   if (ex.all) return result_(false, '오늘은 출석 의무가 없는 기간입니다.');
 
   return locked_(function () {
+    if (schoolRuleEffective_(today_()).all) return result_(false, '오늘은 출석 의무가 없는 기간입니다.');
     var member = read_('User').filter(function (u) {
       return u.type === 1 && u.id === userId && u.day === current.day && u.shift === current.shift;
     })[0];
