@@ -369,11 +369,13 @@ function api_addMember(d, token) {
   var error = validateMember_(d);
   if (error) return result_(false, error);
   return locked_(function () {
+    rosterRequireBaseline_();
     var row = insert_(
       'User',
       { name: String(d.name).trim(), grade: Number(d.grade), day: Number(d.day), shift: Number(d.shift), workCount: 0, addCount: 0, runCount: 0, type: 1 },
       ['name', 'type']
     );
+    if (row) rosterLog_(row.id, null, row);
     return row ? result_(true, '추가되었습니다.') : result_(false, '이미 같은 이름의 부원이 있습니다.');
   });
 }
@@ -383,6 +385,8 @@ function api_updateMember(id, d, token) {
   var error = validateMember_(d);
   if (error) return result_(false, error);
   return locked_(function () {
+    rosterRequireBaseline_();
+    var before = read_('User').filter(function (u) { return u.id === Number(id); })[0];
     var r = update_(
       'User',
       Number(id),
@@ -392,6 +396,7 @@ function api_updateMember(id, d, token) {
     );
     if (r === 'DUP') return result_(false, '이미 같은 이름의 부원이 있습니다.');
     if (r === 'NOTFOUND') return result_(false, '존재하지 않는 부원입니다.');
+    rosterLog_(r.id, before, r);
     return result_(true, '수정되었습니다.');
   });
 }
@@ -400,17 +405,24 @@ function api_updateMember(id, d, token) {
 function api_graduate(id, token) {
   requireAdmin_(token);
   return locked_(function () {
+    rosterRequireBaseline_();
+    var before = read_('User').filter(function (u) { return u.id === Number(id); })[0];
     var r = update_('User', Number(id), { type: 0 });
-    return r === 'NOTFOUND' ? result_(false, '존재하지 않는 부원입니다.') : result_(true, '졸업 처리되었습니다.');
+    if (r === 'NOTFOUND') return result_(false, '존재하지 않는 부원입니다.');
+    rosterLog_(r.id, before, r);
+    return result_(true, '졸업 처리되었습니다.');
   });
 }
 
 function api_restore(id, token) {
   requireAdmin_(token);
   return locked_(function () {
+    rosterRequireBaseline_();
+    var before = read_('User').filter(function (u) { return u.id === Number(id); })[0];
     var r = update_('User', Number(id), { type: 1 }, null, ['name', 'type']);
     if (r === 'DUP') return result_(false, '같은 이름의 재학생이 있어 복귀할 수 없습니다.');
     if (r === 'NOTFOUND') return result_(false, '존재하지 않는 부원입니다.');
+    rosterLog_(r.id, before, r);
     return result_(true, '재학생으로 복귀했습니다.');
   });
 }
