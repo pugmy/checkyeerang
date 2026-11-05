@@ -320,7 +320,8 @@ function api_makeup(userId, detail) {
   });
 }
 
-function api_admin(date) {
+function api_admin(date, token) {
+  requireAdmin_(token);
   var today = today_();
   var range = parseDate_(date);
   if (!range) {
@@ -343,7 +344,8 @@ function api_admin(date) {
   return { today: today, date: date, day: range.day, users: users.sort(byName_), records: records, exempt: exempt };
 }
 
-function api_members() {
+function api_members(token) {
+  requireAdmin_(token);
   return read_('User').sort(function (a, b) {
     return a.day - b.day || SHIFT_ORDER[a.shift] - SHIFT_ORDER[b.shift] || byName_(a, b);
   });
@@ -358,7 +360,8 @@ function validateMember_(d) {
   return null;
 }
 
-function api_addMember(d) {
+function api_addMember(d, token) {
+  requireAdmin_(token);
   var error = validateMember_(d);
   if (error) return result_(false, error);
   return locked_(function () {
@@ -371,7 +374,8 @@ function api_addMember(d) {
   });
 }
 
-function api_updateMember(id, d) {
+function api_updateMember(id, d, token) {
+  requireAdmin_(token);
   var error = validateMember_(d);
   if (error) return result_(false, error);
   return locked_(function () {
@@ -389,14 +393,16 @@ function api_updateMember(id, d) {
 }
 
 // 조기졸업처럼 사람이 직접 졸업 처리한다. 기록은 남는다.
-function api_graduate(id) {
+function api_graduate(id, token) {
+  requireAdmin_(token);
   return locked_(function () {
     var r = update_('User', Number(id), { type: 0 });
     return r === 'NOTFOUND' ? result_(false, '존재하지 않는 부원입니다.') : result_(true, '졸업 처리되었습니다.');
   });
 }
 
-function api_restore(id) {
+function api_restore(id, token) {
+  requireAdmin_(token);
   return locked_(function () {
     var r = update_('User', Number(id), { type: 1 }, null, ['name', 'type']);
     if (r === 'DUP') return result_(false, '같은 이름의 재학생이 있어 복귀할 수 없습니다.');
@@ -436,7 +442,8 @@ function promoteYearly() {
 }
 
 // 출석 이력이 있는 부원은 삭제하지 않는다. 졸업 처리로 기록을 보존한다.
-function api_deleteMember(id) {
+function api_deleteMember(id, token) {
+  requireAdmin_(token);
   id = Number(id);
   if (!Number.isSafeInteger(id) || id <= 0) return result_(false, '올바른 부원을 선택하세요.');
   return locked_(function () {
@@ -471,7 +478,8 @@ function formatKST_(d) {
   return Utilities.formatDate(d, TZ, 'yyyy. M. d') + ' ' + (h < 12 ? '오전' : '오후') + ' ' + (h % 12 || 12) + Utilities.formatDate(d, TZ, ':mm:ss');
 }
 
-function api_csv(from, to) {
+function api_csv(from, to, token) {
+  requireAdmin_(token);
   var f = parseDate_(from);
   var t = parseDate_(to);
   if (!f || !t) return { ok: false, message: '시작일과 종료일을 올바르게 입력하세요.' };
