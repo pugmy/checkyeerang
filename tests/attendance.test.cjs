@@ -21,6 +21,7 @@ function harness(data) {
   context.rosterRequireBaseline_ = () => {};
   context.rosterAssertConsistent_ = () => {};
   context.rosterLog_ = () => {};
+  context.rosterSaveEventOrRollback_ = (before, after) => context.rosterLog_(after.id, before, after);
   context.update_ = (table, id, changes) => {
     const row = rows[table].find(r => r.id === id);
     if (!row) return "NOTFOUND";
