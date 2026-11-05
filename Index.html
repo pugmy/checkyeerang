@@ -177,6 +177,17 @@ const errText = (e) => {
 
 // 관리자 토큰은 메모리에만 보관한다. 탭/브라우저를 닫으면 다시 로그인해야 한다.
 let adminToken = '';
+let adminIdleTimer = null;
+const ADMIN_IDLE_MS = 15 * 60 * 1000;
+function renewAdminIdle() {
+  clearTimeout(adminIdleTimer);
+  if (!adminToken) return;
+  adminIdleTimer = setTimeout(() => { if (adminToken) logoutAdmin(); }, ADMIN_IDLE_MS);
+}
+// 공용 PC에서 학생의 일반 출석 조작은 관리자 세션을 연장하지 않는다.
+['pointerdown', 'keydown'].forEach((eventName) => document.addEventListener(eventName, () => {
+  if (adminToken && currentTab !== 'home') renewAdminIdle();
+}));
 const adminApi = async (name, ...args) => {
   try { return await api(name, ...args, adminToken); }
   catch (e) {
@@ -187,8 +198,9 @@ const adminApi = async (name, ...args) => {
 async function logoutAdmin() {
   const token = adminToken;
   adminToken = '';
-  try { await api('api_adminLogout', token); } catch (_) { /* 화면에서 세션은 즉시 폐기 */ }
+  clearTimeout(adminIdleTimer);
   show('home');
+  try { await api('api_adminLogout', token); } catch (_) { /* 로컬 세션은 폐기됨 */ }
 }
 function adminLoginView(destination) {
   const password = h('input', { type: 'password', class: 'field', autocomplete: 'current-password',
@@ -203,6 +215,7 @@ function adminLoginView(destination) {
     password.value = '';
     if (!response.ok) { message.textContent = response.message; return; }
     adminToken = response.token;
+    renewAdminIdle();
     show(destination);
   } });
   form.append(h('label', { class: 'label' }, '관리자 비밀번호', password), message, submit);
@@ -290,8 +303,10 @@ const tabs = { home: ['출석체크', renderHome], admin: ['출석관리', rende
 const nav = document.getElementById('nav');
 const main = document.getElementById('main');
 let token = 0;
+let currentTab = 'home';
 
 async function show(name) {
+  currentTab = name;
   const mine = ++token;
   for (const b of nav.children) b.removeAttribute('aria-current');
   nav.querySelector('[data-tab="' + name + '"]').setAttribute('aria-current', 'page');
