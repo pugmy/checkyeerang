@@ -628,12 +628,37 @@ function memberModal(member) {
     const name = h('input', { class: 'field', value: f.name, 'aria-label': '이름' });
     const msg = h('p', { class: 'msg bad-text', role: 'status' });
     const save = h('button', { type: 'button', class: 'btn primary' }, member ? '저장' : '추가');
-    save.onclick = async () => {
-      const data = { name: name.value, grade: f.grade, day: f.day, shift: f.shift };
-      let r;
-      try { r = await busy(save, '저장 중...', () => (member ? adminApi('api_updateMember', member.id, data) : adminApi('api_addMember', data))); }
-      catch (e) { r = { ok: false, message: errText(e) }; }
-      if (r.ok) { close(); show('member'); } else msg.textContent = r.message;
+    save.onclick = () => {
+      const data = { name: name.value.trim(), grade: f.grade, day: f.day, shift: f.shift };
+      if (!data.name) { msg.textContent = '이름을 입력해 주세요.'; name.focus(); return; }
+      if (member && ['name', 'grade', 'day', 'shift'].every(k => member[k] === data[k])) {
+        msg.textContent = '변경된 내용이 없습니다.';
+        return;
+      }
+      let pending = false;
+      openModal({ label: '부원 정보 확인', alert: true, narrow: true, canClose: () => !pending }, (confirmation, dismiss) => {
+        const send = h('button', { type: 'button', class: 'btn primary' }, member ? '수정 확정' : '등록 확정');
+        const cancel = h('button', { type: 'button', class: 'btn ghost', onclick: dismiss }, '다시 확인');
+        send.onclick = async () => {
+          pending = true;
+          cancel.disabled = true;
+          let r;
+          try { r = await busy(send, '저장 중...', () =>
+            member ? adminApi('api_updateMember', member.id, data) : adminApi('api_addMember', data)); }
+          catch (e) { r = { ok: false, message: errText(e) }; }
+          pending = false;
+          cancel.disabled = false;
+          if (!r.ok) { dismiss(); msg.textContent = r.message; return; }
+          dismiss();
+          close();
+          show('member');
+        };
+        confirmation.append(
+          h('h3', {}, member ? '변경할 부원 정보를 확인해 주세요.' : '새 부원을 등록할까요?'),
+          h('p', { class: 'detail' },
+            data.name + ' · ' + data.grade + '학년 · ' + DAYS[data.day - 1] + '요일 · ' + SHIFT[data.shift]),
+          h('div', { class: 'actions' }, cancel, send));
+      });
     };
     box.append(
       h('h2', {}, member ? '부원 수정' : '부원 추가'),
