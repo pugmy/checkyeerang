@@ -513,6 +513,7 @@ function api_csv(from, to, token) {
 
   var users = {};
   read_('User').forEach(function (u) { users[u.id] = u; });
+  var rosterIndex = rosterIndex_();
   // 출석일 기준으로 조회한다. 저장 시각(createdAt)은 일시 표시용이다.
   var records = read_('choolsuck')
     .filter(function (r) {
@@ -521,9 +522,10 @@ function api_csv(from, to, token) {
     })
     .sort(function (a, b) { return a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : a.id - b.id; });
 
-  var lines = [['요일', '일시', '시간', '이름', '학년', '구분', '담당 요일', '담당 시간', '특이사항'].map(cell_).join(',')];
+  var lines = [['요일', '일시', '시간', '이름', '학년', '구분', '담당 요일', '담당 시간', '특이사항', '시간표 이력'].map(cell_).join(',')];
   records.forEach(function (r) {
-    var u = users[r.userId];
+    var snapshot = rosterForRecord_(rosterIndex, r, users[r.userId]);
+    var u = snapshot.user;
     var at = new Date(r.createdAt);
     var h = Number(Utilities.formatDate(at, TZ, 'H'));
     var recorded = h >= 12 && h < 14 ? '점심' : h >= 17 && h < 19 ? '저녁' : ''; // 기록된 시각 기준
@@ -538,6 +540,7 @@ function api_csv(from, to, token) {
         DAY_NAME[u.day],
         SHIFT_LABEL[r.kind === 'makeup' ? u.shift : r.shift] || '', // 보충 기록의 shift는 0이라 부원의 당번 시간을 쓴다
         r.detail,
+        snapshot.verified ? '확인됨' : '이력 시작 전·미확인',
       ].map(cell_).join(',')
     );
   });
