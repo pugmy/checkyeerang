@@ -164,7 +164,7 @@ test("history failure restores an existing member's previous state", () => {
 
 test("failed creation removes the newly inserted member if history append fails", () => {
   const h = harness([student]);
-  const created = { id: 8, ...student };
+  const created = { ...student, id: 8 };
   let removed = null;
   h.context.rosterLog_ = () => { throw new Error("sheet write failed"); };
   h.context.delete_ = (table, key, value) => { removed = { table, key, value }; };
