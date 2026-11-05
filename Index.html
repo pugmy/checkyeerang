@@ -134,6 +134,15 @@ h2.sub { font-size: 1.1rem; font-weight: 700; }
 @keyframes pulse-soft { 50% { opacity: .5; } }
 @keyframes check-pop { 0% { transform: scale(.6); opacity: 0; } 70% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
+/* 실제 키오스크의 키보드·터치 사용성 */
+body.modal-open {overflow:hidden;}
+.modal {overscroll-behavior:contain;}
+button, .choice, summary {touch-action:manipulation;}
+@media(max-width:680px) {
+  input, textarea, select {font-size:16px;}
+  .btn.sm {min-height:44px;}
+  .modal {max-height:calc(100dvh - 1rem);}
+}
 /* Checkyeerang UI 2.0 — 조용하고 명확한 도서관용 인터페이스.
    기존 DOM/JS의 기능을 유지하며 시각 체계만 조정한다. */
 :root {
@@ -343,27 +352,53 @@ async function busy(btn, text, fn) {
 
 // ---------- 모달 (바깥 클릭·Esc로 닫힘, 맨 위 모달만 닫는다) ----------
 const stack = [];
+const modalFocusables = (box) =>
+  Array.from(box.querySelectorAll('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'))
+    .filter(el => el.getClientRects().length && el.getAttribute('aria-hidden') !== 'true');
+
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && stack.length) stack[stack.length - 1].tryClose();
+  const active = stack[stack.length - 1];
+  if (!active) return;
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    active.tryClose();
+  } else if (e.key === 'Tab') {
+    // 중첩 확인창에서도 현재 가장 위에 있는 모달 안에서만 이동한다.
+    const focusable = modalFocusables(active.box);
+    if (!focusable.length) { e.preventDefault(); active.box.focus(); return; }
+    const first = focusable[0], last = focusable[focusable.length - 1];
+    if (e.shiftKey && (document.activeElement === first || !active.box.contains(document.activeElement))) {
+      e.preventDefault(); last.focus();
+    } else if (!e.shiftKey && (document.activeElement === last || !active.box.contains(document.activeElement))) {
+      e.preventDefault(); first.focus();
+    }
+  }
 });
 
 function openModal({ label, narrow = false, alert = false, canClose = () => true }, build) {
   const opener = document.activeElement;
-  const box = h('div', { class: 'modal' + (narrow ? ' narrow' : ''), role: alert ? 'alertdialog' : 'dialog', 'aria-modal': 'true', 'aria-label': label });
+  const box = h('div', { class: 'modal' + (narrow ? ' narrow' : ''), role: alert ? 'alertdialog' : 'dialog',
+    'aria-modal': 'true', 'aria-label': label, tabindex: '-1' });
   const back = h('div', { class: 'modal-backdrop', onmousedown: (e) => e.target === back && entry.tryClose() }, box);
-  const entry = {
-    tryClose: () => canClose() && close(),
-  };
+  let closed = false;
+  const entry = { box, tryClose: () => canClose() && close() };
   function close() {
+    if (closed) return;
+    closed = true;
     back.remove();
-    stack.splice(stack.indexOf(entry), 1);
-    if (opener && opener.focus) opener.focus();
+    const index = stack.indexOf(entry);
+    if (index !== -1) stack.splice(index, 1);
+    document.body.classList.toggle('modal-open', stack.length > 0);
+    if (opener && opener.isConnected && opener.focus) opener.focus();
+    else if (stack.length) stack[stack.length - 1].box.focus();
   }
   stack.push(entry);
+  document.body.classList.add('modal-open');
   document.body.append(back);
-  build(box, close);
-  const first = box.querySelector('input, textarea, button');
-  if (first) first.focus();
+  try { build(box, close); }
+  catch (error) { close(); throw error; }
+  const first = modalFocusables(box)[0];
+  (first || box).focus();
 }
 
 function choice(label, options, value, onChange) {
