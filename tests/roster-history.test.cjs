@@ -146,3 +146,49 @@ test("CSV lookup uses the old schedule for an earlier duty", () => {
   assert.equal(result.verified, true);
   assert.equal(result.user.shift, 1);
 });
+
+test("history failure restores an existing member's previous state", () => {
+  const h = harness([student]);
+  const prior = { ...student, _row: 2 };
+  const changed = { ...prior, shift: 3 };
+  let restored = null;
+  h.context.rosterLog_ = () => { throw new Error("sheet write failed"); };
+  h.context.write_ = (table, row) => {
+    assert.equal(table, "User");
+    restored = { ...row };
+  };
+  assert.throws(() => h.context.rosterSaveEventOrRollback_(prior, changed), /되돌렸습니다/);
+  assert.equal(restored.shift, 1);
+  assert.equal(restored._row, 2);
+});
+
+test("failed creation removes the newly inserted member if history append fails", () => {
+  const h = harness([student]);
+  const created = { id: 8, ...student };
+  let removed = null;
+  h.context.rosterLog_ = () => { throw new Error("sheet write failed"); };
+  h.context.delete_ = (table, key, value) => { removed = { table, key, value }; };
+  assert.throws(() => h.context.rosterSaveEventOrRollback_(null, created), /되돌렸습니다/);
+  assert.deepEqual(removed, { table: "User", key: "id", value: 8 });
+});
+
+test("failed compensation is reported, not falsely claimed successful", () => {
+  const h = harness([student]);
+  h.context.rosterLog_ = () => { throw new Error("sheet write failed"); };
+  h.context.write_ = () => { throw new Error("rollback also failed"); };
+  assert.throws(() => h.context.rosterSaveEventOrRollback_(student, { ...student, day: 2 }), /모두 실패/);
+});
+
+test("yearly promotion failure restores the previous cohort", () => {
+  const h = harness([student]);
+  let written = [];
+  h.context.writeAll_ = (table, users) => {
+    assert.equal(table, "User");
+    written.push(users.map(u => u.grade));
+  };
+  h.context.rosterWriteEvents_ = () => { throw new Error("history failed"); };
+  assert.throws(() => h.context.rosterPromoteOrRollback_(
+    [student], [{ ...student, grade: 3 }], [{ userId: 7, patch: { grade: 3 } }], new Date().toISOString()
+  ), /되돌렸습니다/);
+  assert.deepEqual(written, [[3], [2]]);
+});
