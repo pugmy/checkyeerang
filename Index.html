@@ -521,7 +521,7 @@ function deleteModal(m) {
     };
     box.append(
       h('h3', {}, m.name + ' 부원을 삭제할까요?'),
-      h('p', { class: 'muted', style: 'font-size:.9rem' }, '출석·보충·결석 기록도 함께 삭제되며 되돌릴 수 없습니다.'),
+      h('p', { class: 'muted', style: 'font-size:.9rem' }, '출석 기록이 없는 부원만 삭제할 수 있습니다. 기록이 있는 부원은 졸업 처리로 보존하세요.'),
       h('div', { class: 'actions' }, cancel, del));
   });
 }
