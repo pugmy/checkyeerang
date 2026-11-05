@@ -16,8 +16,9 @@ var SCHEMA = {
   RosterHistory: ['id', 'userId', 'effectiveAt', 'patch', 'createdAt'],
   CalendarNotes: ['id', 'date', 'category', 'title', 'detail', 'userId', 'createdAt', 'updatedAt'],
   SchoolDays: ['id', 'startDate', 'endDate', 'category', 'title', 'supersedesId', 'cancelled', 'createdAt', 'updatedAt'],
+  AttendanceCorrections: ['id', 'absenceId', 'userId', 'date', 'shift', 'reason', 'createdAt', 'updatedAt'],
 };
-var TEXT_COLS = ['name', 'kind', 'date', 'detail', 'createdAt', 'updatedAt', 'effectiveAt', 'patch', 'category', 'title', 'startDate', 'endDate'];
+var TEXT_COLS = ['name', 'kind', 'date', 'detail', 'createdAt', 'updatedAt', 'effectiveAt', 'patch', 'category', 'title', 'startDate', 'endDate', 'reason'];
 
 // ---------- 진입점 / 설치 ----------
 
@@ -226,7 +227,7 @@ function recordAbsencesToday_() {
             !isExempt_(exempt, u.grade) &&
             byId[u.id].createdAt < range.start.toISOString() && // 오늘 이전에 등록된 부원만
             !records.some(function (r) {
-              return r.userId === u.id && r.shift === shift && (r.kind === 'duty' || r.kind === 'absent');
+              return r.userId === u.id && r.shift === shift && (r.kind === 'duty' || r.kind === 'absent' || r.kind === 'excused');
             })
           );
         })
@@ -299,7 +300,7 @@ function api_attend(userId, detail) {
 
     var date = today_();
     var already = read_('choolsuck').some(function (r) {
-      return r.userId === member.id && r.date === date && r.shift === current.shift && (r.kind === 'duty' || r.kind === 'absent');
+      return r.userId === member.id && r.date === date && r.shift === current.shift && (r.kind === 'duty' || r.kind === 'absent' || r.kind === 'excused');
     });
     if (already) return result_(false, '오늘은 이미 출석했습니다.');
 
