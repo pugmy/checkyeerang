@@ -487,7 +487,7 @@ function api_applyPromotion(year, expectedIds, token) {
     return result_(false, '진급 대상 학년도를 다시 확인하세요.');
   }
   if (!Array.isArray(expectedIds) || expectedIds.length > 500 ||
-      expectedIds.some(function (id) { return !Number.isSafeInteger(id) || id <= 0; })) {
+      expectedIds.some(function (id) { return typeof id !== 'string' || !/^[1-9]\\d*:[123]$/.test(id); })) {
     return result_(false, '진급 대상 명단이 올바르지 않습니다.');
   }
   return locked_(function () {
@@ -499,8 +499,8 @@ function api_applyPromotion(year, expectedIds, token) {
     rosterAssertConsistent_();
     var users = read_('User');
     var plan = promotionPlan_(users, year);
-    var actual = plan.map(function (x) { return x.id; }).sort(function (a,b) {return a-b;});
-    var expected = expectedIds.slice().sort(function (a,b) {return a-b;});
+    var actual = plan.map(function (x) { return x.id + ':' + x.fromGrade; }).sort();
+    var expected = expectedIds.slice().sort();
     if (actual.length !== expected.length ||
         actual.some(function (id,i) {return id !== expected[i];})) {
       return result_(false, '진급 대상 명단이 변경되었습니다. 미리보기를 다시 확인하세요.');
