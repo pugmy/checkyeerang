@@ -535,6 +535,84 @@ function choice(label, options, value, onChange) {
   return h('div', { class: 'label', role: 'group', 'aria-label': label }, label, row);
 }
 
+// ---------- 출석 면제 일정 ----------
+function schoolRuleModal(rule) {
+  openModal({ label: '등교·시험 일정 설정' }, (box, close) => {
+    const type = h('select', { class: 'field', 'aria-label': '면제 일정 종류' },
+      h('option', { value: 'closed' }, '휴업·방학·공휴일'),
+      h('option', { value: 'exam' }, '시험'));
+    const start = h('input', { class: 'field', type: 'date', 'aria-label': '시작일' });
+    const end = h('input', { class: 'field', type: 'date', 'aria-label': '종료일' });
+    const name = h('input', { class: 'field', maxlength: '80', placeholder: '예: 2학기 기말고사',
+      'aria-label': '일정 이름' });
+    const note = h('p', { class: 'muted', role: 'note' });
+    const msg = h('p', { role: 'alert', class: 'msg bad-text' });
+    const save = h('button', { class: 'btn primary', type: 'button' }, '저장');
+    if (rule) {
+      type.value = rule.category; start.value = rule.startDate;
+      end.value = rule.endDate; name.value = rule.title;
+    } else {
+      start.value = calendarSelected || new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+      end.value = start.value;
+    }
+    function updateTip() {
+      note.textContent = type.value === 'exam'
+        ? '시험 시작일 14일 전부터 종료일까지 출석 의무가 면제됩니다. 시작일에는 시험 첫날을 입력해 주세요.'
+        : '선택한 기간 동안 출석 의무가 면제됩니다. 공휴일·재량휴업일·연휴·방학에 사용하세요.';
+    }
+    type.addEventListener('change', updateTip);
+    updateTip();
+    save.onclick = async () => {
+      const data = { category: type.value, startDate: start.value,
+        endDate: end.value, title: name.value.trim() };
+      let result;
+      try { result = await busy(save, '저장 중...', () =>
+        adminApi('api_schoolRuleSave', data, rule?.id || 0)); }
+      catch (e) { result = { ok: false, message: errText(e) }; }
+      if (!result.ok) { msg.textContent = result.message; return; }
+      close(); show('calendar');
+    };
+    box.append(h('h2', {}, rule ? '면제 일정 수정' : '면제 일정 등록'),
+      h('label', { class: 'label' }, '종류', type),
+      h('label', { class: 'label' }, '시작일', start),
+      h('label', { class: 'label' }, '종료일', end),
+      h('label', { class: 'label' }, '일정 이름', name), note, msg,
+      h('div', { class: 'actions' },
+        h('button', { type: 'button', class: 'btn ghost', onclick: close }, '취소'), save));
+  });
+}
+async function schoolRulesModal() {
+  const rules = await adminApi('api_schoolRules');
+  openModal({ label: '등교·시험 일정 관리' }, (box, close) => {
+    const list = rules.map(rule =>
+      h('li', { class: 'calendar-detail-row' },
+        h('div', {},
+          h('strong', {}, rule.title),
+          h('small', { class: 'calendar-caption' },
+            rule.startDate + (rule.endDate !== rule.startDate ? ' ~ ' + rule.endDate : '') +
+            ' · ' + (rule.category === 'exam' ? '시험' : '휴업·방학'))),
+        h('div', { class: 'row wrap' },
+          h('button', { type: 'button', class: 'btn ghost sm',
+            onclick: () => { close(); schoolRuleModal(rule); } }, '수정'),
+          h('button', { type: 'button', class: 'btn ghost sm', onclick: async () => {
+            if (!confirm('이 면제 일정을 해제할까요?')) return;
+            let result;
+            try { result = await adminApi('api_schoolRuleCancel', rule.id); }
+            catch (e) { result = { ok: false, message: errText(e) }; }
+            if (!result.ok) { alert(result.message); return; }
+            close(); show('calendar');
+          } }, '해제'))));
+    box.append(h('h2', {}, '등교·시험 일정'),
+      h('p', { class: 'muted' }, '시험 첫날과 휴업 기간을 설정합니다. 과거 날짜도 정정할 수 있습니다.'),
+      h('ul', { class: 'calendar-detail-list' },
+        list.length ? list : [h('li', { class: 'muted' }, '등록된 면제 일정이 없습니다.')]),
+      h('div', { class: 'actions' },
+        h('button', { type: 'button', class: 'btn ghost', onclick: close }, '닫기'),
+        h('button', { type: 'button', class: 'btn primary',
+          onclick: () => { close(); schoolRuleModal(null); } }, '+ 일정 등록')));
+  });
+}
+
 // ---------- 월간 일정 ----------
 const CALENDAR_LABELS = { activity: '활동·행사', makeup_plan: '보충 예정', notice: '메모' };
 let calendarMonth = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(0, 7);
@@ -623,6 +701,11 @@ async function renderCalendar() {
             adminDate = date; show('admin');
           } }, '출석 기록 보기'),
           h('button', { class: 'btn primary sm', type: 'button', onclick: () => calendarNoteModal(date) }, '+ 일정 추가'))),
+      day.school?.all && h('p', { class: 'school-notice', role: 'note' },
+        day.school.reasons.some(r => r.category === 'exam') ? '시험 기간입니다' : '출석 의무가 없는 날입니다',
+        h('small', {}, day.school.reasons.map(r => r.title).join(' · '))),
+      day.needsReview && h('p', { class: 'bad-text', role: 'note' },
+        '이 날짜에 면제 대상 결석 기록이 있습니다. 출석 관리에서 확인해 주세요.'),
       !day.verified && h('p', { class: 'muted' }, '이력 도입 전 시간표는 확인되지 않습니다.'),
       h('h3', { class: 'calendar-detail-title' }, '정규 당번'),
       h('ul', { class: 'calendar-detail-list' }, slots),
@@ -650,6 +733,8 @@ async function renderCalendar() {
       h('span', { class: 'calendar-day-number' }, String(Number(day.date.slice(-2)))),
       names.length ? h('span', { class: 'calendar-day-names' },
         names.slice(0, 2).join(', ') + (names.length > 2 ? ' 외 ' + (names.length - 2) + '명' : '')) : null,
+      day.school?.all ? h('span', { class: 'calendar-day-note' },
+        day.school.reasons.some(r => r.category === 'exam') ? '시험' : '휴업') : null,
       day.notes.length ? h('span', { class: 'calendar-day-note' }, '일정 ' + day.notes.length) : null,
       day.records.some(rec => rec.kind === 'makeup') ?
         h('span', { class: 'calendar-day-record' }, '보충 완료') : null);
@@ -661,7 +746,11 @@ async function renderCalendar() {
     h('div', { class: 'between' },
       h('div', {}, h('h1', { class: 'title' }, '도서관 일정'),
         h('p', { class: 'muted' }, '날짜를 선택해 당번과 행사, 보충 예정 및 출석 기록을 확인하세요.')),
-      logoutControl()),
+      h('div', { class: 'row wrap' },
+        h('button', { class: 'btn ghost sm', type: 'button', onclick: async () => {
+          try { await schoolRulesModal(); } catch (e) { alert(errText(e)); }
+        } }, '등교·시험 일정'),
+        logoutControl())),
     h('div', { class: 'calendar-toolbar' },
       h('button', { type: 'button', class: 'btn ghost sm',
         onclick: () => { calendarMonth = calendarMove(calendarMonth, -1); show('calendar'); } }, '이전 달'),
