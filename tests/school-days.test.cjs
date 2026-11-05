@@ -17,10 +17,11 @@ function fixture() {
     parseDate_: value => {
       if (!/^\d{4}-\d\d-\d\d$/.test(String(value))) return null;
       const d = new Date(value + 'T00:00:00+09:00');
-      return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== value ? null :
+      return Number.isNaN(d.getTime()) ||
+        new Date(d.getTime() + 9 * 3600000).toISOString().slice(0, 10) !== value ? null :
         { start: d };
     },
-    today_: d => new Date(d).toISOString().slice(0, 10),
+    today_: d => new Date(new Date(d).getTime() + 9 * 3600000).toISOString().slice(0, 10),
     result_: (ok, message) => ({ ok, message }),
     requireAdmin_: token => { if (token !== 'admin') throw Error('관리자 로그인'); },
     locked_: callback => callback(),
