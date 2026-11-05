@@ -3,6 +3,7 @@ function rosterAuditData_(users, events, baseline, at) {
   var errors = [];
   var current = {};
   var history = {};
+  var seenEvents = {};
   users.forEach(function (u) {
     if (!Number.isSafeInteger(u.id) || u.id <= 0 || current[u.id]) {
       errors.push({ code: 'INVALID_USER_ID', userId: u.id });
@@ -17,13 +18,23 @@ function rosterAuditData_(users, events, baseline, at) {
       errors.push({ code: 'INVALID_EVENT', id: e.id });
       return;
     }
+    if (seenEvents[e.id]) {
+      errors.push({ code: 'DUPLICATE_EVENT_ID', id: e.id });
+      return;
+    }
+    seenEvents[e.id] = true;
     var patch;
     try { patch = JSON.parse(e.patch); }
     catch (_) { errors.push({ code: 'INVALID_PATCH', id: e.id }); return; }
     if (!patch || Array.isArray(patch) || typeof patch !== 'object' ||
         !Object.keys(patch).length ||
         Object.keys(patch).some(function (key) {
-          return ROSTER_FIELDS_.indexOf(key) < 0;
+          return ROSTER_FIELDS_.indexOf(key) < 0 ||
+            (key === 'name' && (typeof patch[key] !== 'string' || !patch[key].trim())) ||
+            (key === 'grade' && [1, 2, 3].indexOf(patch[key]) < 0) ||
+            (key === 'day' && [1, 2, 3, 4, 5].indexOf(patch[key]) < 0) ||
+            (key === 'shift' && [1, 2, 3].indexOf(patch[key]) < 0) ||
+            (key === 'type' && [-1, 0, 1].indexOf(patch[key]) < 0);
         })) {
       errors.push({ code: 'INVALID_PATCH', id: e.id });
       return;
