@@ -128,3 +128,35 @@ function rosterForRecord_(index, record, fallback) {
   var historical = rosterStateAt_(index, record.userId, at);
   return { user: historical || fallback, verified: rosterCovered_(at) && !!historical };
 }
+
+
+// Sheets에는 교차 탭 트랜잭션이 없다. 이벤트 쓰기 실패 시 최신 상태를 가능한 범위에서 되돌린다.
+// 성공 여부가 불확실한 원격 시트 쓰기를 '완전한 롤백'으로 간주하지 않는다.
+// 실패 이후에는 rosterAudit_로 현재 상태와 이벤트 상태의 일치를 확인해야 한다.
+function rosterSaveEventOrRollback_(before, after) {
+  try {
+    rosterLog_(after.id, before, after);
+  } catch (writeError) {
+    try {
+      if (before) write_('User', before);
+      else delete_('User', 'id', after.id);
+    } catch (rollbackError) {
+      throw new Error('시간표 이력 저장과 부원 정보 복원이 모두 실패했습니다. 원본 시트를 보존하고 관리자 점검을 요청하세요.');
+    }
+    throw new Error('시간표 이력 저장이 실패하여 부원 변경을 되돌렸습니다. 이력 점검을 실행하세요.');
+  }
+}
+
+function rosterPromoteOrRollback_(previous, current, changes, stamp) {
+  writeAll_('User', current);
+  try {
+    rosterWriteEvents_(changes, stamp);
+  } catch (writeError) {
+    try {
+      writeAll_('User', previous);
+    } catch (rollbackError) {
+      throw new Error('진급 이력 저장과 기존 부원 정보 복원이 모두 실패했습니다. 관리자 점검이 필요합니다.');
+    }
+    throw new Error('진급 이력 저장이 실패하여 진급을 되돌렸습니다. 이력 점검이 필요합니다.');
+  }
+}
