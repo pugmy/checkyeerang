@@ -473,9 +473,11 @@ function api_promotionPreview(token) {
   requireAdmin_(token);
   var year = promotionYear_();
   if (!year) return { ok: false, message: '3월 1일부터 새 학년도 진급을 처리할 수 있습니다.' };
-  var done = Number(PropertiesService.getScriptProperties().getProperty('PROMOTED_YEAR')) >= year;
-  var plan = done ? [] : promotionPlan_(read_('User'), year);
-  return { ok: true, year: year, done: done, members: plan,
+  var props = PropertiesService.getScriptProperties();
+  var done = Number(props.getProperty('PROMOTED_YEAR')) >= year;
+  var reviewRequired = !done && !!props.getProperty('PROMOTION_PENDING_YEAR');
+  var plan = done || reviewRequired ? [] : promotionPlan_(read_('User'), year);
+  return { ok: true, year: year, done: done, reviewRequired: reviewRequired, members: plan,
     promotions: plan.filter(function (u) { return u.action === 'promote'; }).length,
     graduates: plan.filter(function (u) { return u.action === 'graduate'; }).length };
 }
@@ -495,6 +497,9 @@ function api_applyPromotion(year, expectedIds, token) {
     if (Number(props.getProperty('PROMOTED_YEAR')) >= year) {
       return result_(false, '이번 학년도 진급은 이미 처리되었습니다.');
     }
+    if (props.getProperty('PROMOTION_PENDING_YEAR')) {
+      return result_(false, '이전 진급 처리 결과를 확인해야 합니다. 이력 점검 후 담당자가 상태를 확인하세요.');
+    }
     rosterRequireBaseline_();
     rosterAssertConsistent_();
     var users = read_('User');
@@ -512,8 +517,11 @@ function api_applyPromotion(year, expectedIds, token) {
     var changes = users.map(function (u,i) {
       return { userId: u.id, patch: rosterPatch_(previous[i], u) };
     }).filter(function (x) { return Object.keys(x.patch).length > 0; });
+    // 완료 표식 저장에 실패해도 다시 진급되지 않도록, 변경 전에 시작 표식을 남긴다.
+    props.setProperty('PROMOTION_PENDING_YEAR', String(year));
     rosterPromoteOrRollback_(previous, users, changes, stamp);
     props.setProperty('PROMOTED_YEAR', String(year));
+    props.deleteProperty('PROMOTION_PENDING_YEAR');
     return result_(true, year + '학년도 진급 처리가 완료되었습니다.');
   });
 }
