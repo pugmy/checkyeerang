@@ -11,7 +11,7 @@ var DEADLINE_MINUTE = { 1: 13 * 60, 3: 13 * 60 + 20, 2: 18 * 60 + 20 };
 var SHIFT_ORDER = { 1: 1, 3: 2, 2: 3 }; // 목록 정렬용: 점심 전, 점심 후, 저녁
 
 var SCHEMA = {
-  User: ['id', 'name', 'grade', 'day', 'shift', 'workCount', 'addCount', 'runCount', 'createdAt', 'updatedAt', 'type'], // type: 0 졸업생, 1 재학생
+  User: ['id', 'name', 'grade', 'day', 'shift', 'workCount', 'addCount', 'runCount', 'createdAt', 'updatedAt', 'type'], // type: -1 명단 제외, 0 졸업생, 1 재학생
   choolsuck: ['id', 'userId', 'day', 'shift', 'kind', 'date', 'detail', 'createdAt', 'updatedAt'],
   RosterHistory: ['id', 'userId', 'effectiveAt', 'patch', 'createdAt'],
 };
