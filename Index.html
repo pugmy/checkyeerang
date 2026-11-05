@@ -265,6 +265,28 @@ h2.sub {font-size:1.07rem;font-weight:700;}
 .credit-person a:focus-visible {outline:2px solid var(--brand);outline-offset:3px;border-radius:2px;}
 .credits-divider {color:var(--muted);}
 @media(max-width:450px) {.credits-divider {display:none;}.credits-label {flex-basis:100%;}}
+/* 월간 달력 */
+.calendar-toolbar {display:flex;align-items:center;justify-content:center;gap:1rem;margin:.5rem 0 1rem;}
+.calendar-scroll {overflow-x:auto;border:1px solid var(--line);border-radius:.65rem;background:var(--surface);}
+.calendar-scroll:focus-visible {outline:3px solid var(--brand);outline-offset:2px;}
+.calendar-grid {display:grid;grid-template-columns:repeat(7,minmax(0,1fr));min-width:650px;}
+.calendar-weekday {padding:.65rem;text-align:center;font-size:.85rem;font-weight:700;background:var(--idle-soft);border-bottom:1px solid var(--line);}
+.calendar-day {font:inherit;color:var(--ink);background:var(--surface);border:0;border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:.6rem;text-align:left;min-height:6.5rem;display:flex;flex-direction:column;gap:.3rem;cursor:pointer;min-width:0;}
+.calendar-day:nth-child(7n) {border-right:0;}
+.calendar-day:hover {background:var(--brand-soft);}
+.calendar-day[aria-pressed="true"] {background:var(--brand-soft);box-shadow:inset 0 0 0 2px var(--brand);}
+.calendar-day:focus-visible {outline:3px solid var(--brand);outline-offset:-3px;}
+.calendar-day.other-month {color:var(--muted);background:var(--idle-soft);}
+.calendar-day-number {font-weight:750;font-size:.95rem;}
+.calendar-day-names {font-size:.77rem;line-height:1.4;overflow-wrap:anywhere;}
+.calendar-day-note,.calendar-day-record {font-size:.73rem;color:var(--brand);font-weight:650;}
+.calendar-details {border:1px solid var(--line);border-radius:.65rem;padding:1.3rem;background:var(--surface);}
+.calendar-detail-title {font-size:.87rem;font-weight:700;margin:1.25rem 0 .5rem;}
+.calendar-detail-list {display:flex;flex-direction:column;gap:.4rem;}
+.calendar-detail-row {display:flex;justify-content:space-between;align-items:center;gap:.8rem;padding:.5rem 0;border-bottom:1px solid var(--line);}
+.calendar-detail-row:last-child {border:0;}
+.calendar-caption {display:block;color:var(--muted);font-size:.83rem;}
+@media(max-width:650px) {.calendar-details {padding:1rem;}.calendar-toolbar {gap:.45rem;}}
 /* UI 2.1 — 학생 메인 화면은 중앙 집중, 관리자 화면은 넓은 작업 공간 */
 .home-page {max-width:52rem;margin-inline:auto;}
 .home-page .date-title {text-align:center;padding:1rem .25rem 1.75rem;}
@@ -500,8 +522,145 @@ function choice(label, options, value, onChange) {
   return h('div', { class: 'label', role: 'group', 'aria-label': label }, label, row);
 }
 
+// ---------- 월간 일정 ----------
+const CALENDAR_LABELS = { activity: '활동·행사', makeup_plan: '보충 예정', notice: '메모' };
+let calendarMonth = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(0, 7);
+let calendarSelected = '';
+function calendarMove(month, delta) {
+  const [year, number] = month.split('-').map(Number);
+  return new Date(Date.UTC(year, number - 1 + delta, 1)).toISOString().slice(0, 7);
+}
+function calendarNoteModal(date) {
+  openModal({ label: '일정 등록' }, (box, close) => {
+    const title = h('input', { class: 'field', placeholder: '일정 이름', maxlength: '80', 'aria-label': '일정 이름' });
+    const detail = h('textarea', { class: 'field', rows: '3', maxlength: '300',
+      placeholder: '필요하면 메모를 적어 주세요.', 'aria-label': '일정 메모' });
+    const type = h('select', { class: 'field', 'aria-label': '일정 종류' },
+      Object.entries(CALENDAR_LABELS).map(([value, label]) => h('option', { value }, label)));
+    const member = h('select', { class: 'field', 'aria-label': '보충 예정 부원' });
+    const memberRow = h('label', { class: 'label' }, '보충 예정 부원', member);
+    memberRow.hidden = true;
+    type.addEventListener('change', () => { memberRow.hidden = type.value !== 'makeup_plan'; });
+    const info = h('p', { class: 'msg bad-text', role: 'alert' });
+    const save = h('button', { class: 'btn primary', type: 'button' }, '일정 저장');
+    save.onclick = async () => {
+      const payload = {
+        date, category: type.value, title: title.value.trim(), detail: detail.value.trim(),
+        userId: type.value === 'makeup_plan' ? Number(member.value) : 0
+      };
+      if (!payload.title) { info.textContent = '일정 이름을 입력해 주세요.'; return; }
+      try {
+        const res = await busy(save, '저장 중...', () => adminApi('api_calendarAdd', payload));
+        if (!res.ok) { info.textContent = res.message; return; }
+        close(); show('calendar');
+      } catch (e) { info.textContent = errText(e); }
+    };
+    box.append(h('h2', {}, '일정 등록'), h('p', { class: 'muted' }, date),
+      h('label', { class: 'label' }, '종류', type), memberRow,
+      h('label', { class: 'label' }, '일정 이름', title),
+      h('label', { class: 'label' }, '메모', detail), info,
+      h('div', { class: 'actions' },
+        h('button', { class: 'btn ghost', type: 'button', onclick: close }, '취소'), save));
+    adminApi('api_members').then(users => {
+      users.filter(u => u.type === 1).forEach(u =>
+        member.append(h('option', { value: String(u.id) }, u.name + ' · ' + u.grade + '학년')));
+    }).catch(() => { info.textContent = '부원 명단을 불러오지 못했습니다.'; });
+  });
+}
+async function renderCalendar() {
+  const data = await adminApi('api_calendarMonth', calendarMonth);
+  if (!data.ok) throw new Error(data.message || '달력을 불러오지 못했습니다.');
+  if (!data.days.some(d => d.date === calendarSelected && d.inMonth)) {
+    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+    calendarSelected = data.days.find(d => d.date === today && d.inMonth)?.date ||
+      data.days.find(d => d.inMonth)?.date || '';
+  }
+  const dayDetail = h('section', { class: 'calendar-details', 'aria-live': 'polite' });
+  const shiftNames = { 1: '점심 전', 3: '점심 후', 2: '저녁' };
+  let grid;
+  function detail(date) {
+    const day = data.days.find(d => d.date === date);
+    if (!day) return;
+    calendarSelected = date;
+    const slots = day.slots.map(slot =>
+      h('li', { class: 'calendar-detail-row' },
+        h('span', { class: 'bold' }, shiftNames[slot.shift]),
+        h('span', {}, day.verified ?
+          (slot.members.length ? slot.members.map(m => m.name).join(', ') : '—') : '이력 미확인')));
+    const notes = day.notes.map(note =>
+      h('li', { class: 'calendar-detail-row' },
+        h('span', {}, CALENDAR_LABELS[note.category] + ' · ' +
+          (note.name ? note.name + ' · ' : '') + note.title,
+          note.detail ? h('small', { class: 'calendar-caption' }, note.detail) : null),
+        h('button', { type: 'button', class: 'btn ghost sm', onclick: async () => {
+          if (!confirm('이 일정을 삭제할까요?')) return;
+          try {
+            const res = await adminApi('api_calendarDelete', note.id);
+            if (res.ok) show('calendar'); else alert(res.message);
+          } catch (e) { alert(errText(e)); }
+        } }, '삭제')));
+    const records = day.records.map(rec =>
+      h('li', { class: 'calendar-detail-row' }, rec.name + ' · ' +
+        ({ duty: '출석 완료', makeup: '보충 완료', absent: '결석' })[rec.kind]));
+    dayDetail.replaceChildren(
+      h('div', { class: 'between' },
+        h('h2', { class: 'sub' }, date + ' 일정'),
+        h('div', { class: 'row wrap' },
+          h('button', { class: 'btn ghost sm', type: 'button', onclick: () => {
+            adminDate = date; show('admin');
+          } }, '출석 기록 보기'),
+          h('button', { class: 'btn primary sm', type: 'button', onclick: () => calendarNoteModal(date) }, '+ 일정 추가'))),
+      !day.verified && h('p', { class: 'muted' }, '이력 도입 전 시간표는 확인되지 않습니다.'),
+      h('h3', { class: 'calendar-detail-title' }, '정규 당번'),
+      h('ul', { class: 'calendar-detail-list' }, slots),
+      h('h3', { class: 'calendar-detail-title' }, '등록된 일정'),
+      h('ul', { class: 'calendar-detail-list' },
+        notes.length ? notes : [h('li', { class: 'muted' }, '등록된 일정이 없습니다.')]),
+      h('h3', { class: 'calendar-detail-title' }, '출석 기록'),
+      h('ul', { class: 'calendar-detail-list' },
+        records.length ? records : [h('li', { class: 'muted' }, '출석 기록이 없습니다.')]));
+  }
+  const headings = ['월', '화', '수', '목', '금', '토', '일'].map(day =>
+    h('span', { class: 'calendar-weekday' }, day));
+  const cells = data.days.map(day => {
+    const names = day.verified ? day.slots.flatMap(slot => slot.members.map(m => m.name)) : [];
+    const button = h('button', { type: 'button',
+      class: 'calendar-day' + (day.inMonth ? '' : ' other-month'),
+      'aria-label': day.date + ' · 당번 ' + names.length + '명 · 일정 ' + day.notes.length + '건',
+      'aria-pressed': String(day.date === calendarSelected),
+      onclick: () => {
+        Array.from(grid.querySelectorAll('button')).forEach(el => el.setAttribute('aria-pressed', 'false'));
+        button.setAttribute('aria-pressed', 'true');
+        detail(day.date);
+      }
+    },
+      h('span', { class: 'calendar-day-number' }, String(Number(day.date.slice(-2)))),
+      names.length ? h('span', { class: 'calendar-day-names' },
+        names.slice(0, 2).join(', ') + (names.length > 2 ? ' 외 ' + (names.length - 2) + '명' : '')) : null,
+      day.notes.length ? h('span', { class: 'calendar-day-note' }, '일정 ' + day.notes.length) : null,
+      day.records.some(rec => rec.kind === 'makeup') ?
+        h('span', { class: 'calendar-day-record' }, '보충 완료') : null);
+    return button;
+  });
+  grid = h('div', { class: 'calendar-grid', role: 'group', 'aria-label': calendarMonth + ' 월간 달력' }, headings, cells);
+  detail(calendarSelected);
+  return h('div', { class: 'stack' },
+    h('div', { class: 'between' },
+      h('div', {}, h('h1', { class: 'title' }, '도서관 일정'),
+        h('p', { class: 'muted' }, '날짜를 선택해 당번과 행사, 보충 예정 및 출석 기록을 확인하세요.')),
+      logoutControl()),
+    h('div', { class: 'calendar-toolbar' },
+      h('button', { type: 'button', class: 'btn ghost sm',
+        onclick: () => { calendarMonth = calendarMove(calendarMonth, -1); show('calendar'); } }, '이전 달'),
+      h('h2', { class: 'sub' }, calendarMonth.replace('-', '년 ') + '월'),
+      h('button', { type: 'button', class: 'btn ghost sm',
+        onclick: () => { calendarMonth = calendarMove(calendarMonth, 1); show('calendar'); } }, '다음 달')),
+    h('div', { class: 'calendar-scroll', tabindex: '0' }, grid), dayDetail,
+    h('p', { class: 'muted' }, '행사와 보충 예정은 일정 표시이며, 출석 인정이나 결석 면제에 자동 반영되지 않습니다.'));
+}
+
 // ---------- 탭 ----------
-const tabs = { home: ['출석체크', renderHome], admin: ['출석관리', renderAdmin], member: ['부원관리', renderMember] };
+const tabs = { home: ['출석체크', renderHome], admin: ['출석관리', renderAdmin], member: ['부원관리', renderMember], calendar: ['달력', renderCalendar] };
 const nav = document.getElementById('nav');
 const main = document.getElementById('main');
 let token = 0;
