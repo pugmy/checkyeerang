@@ -1,5 +1,5 @@
 // 도서부 출석체크: 화면(Index.html) + 서버 로직 + 구글 시트 DB를 모두 Apps Script에서 돌린다.
-// 처음 한 번 setup()을 실행하면 시트 파일(User, choolsuck 탭)과 결석 자동 기록 트리거가 만들어진다.
+// 처음 한 번 setup_()을 실행하면 시트 파일(User, choolsuck 탭)과 결석 자동 기록 트리거가 만들어진다.
 
 var TZ = 'Asia/Seoul';
 // shift 값: 1 점심 전, 2 저녁, 3 점심 후 (기존 데이터의 1/2를 그대로 쓰려고 점심 후를 3으로 추가했다)
@@ -26,7 +26,7 @@ function doGet() {
 }
 
 // 시트 파일이 없으면 만들고, 탭/헤더를 맞추고, 결석 자동 기록 트리거(5분마다)를 건다. 여러 번 실행해도 된다.
-function setup() {
+function setup_() {
   var props = PropertiesService.getScriptProperties();
   var id = props.getProperty('SHEET_ID');
   var ss = id ? SpreadsheetApp.openById(id) : SpreadsheetApp.create('도서부 출석체크 DB');
@@ -45,9 +45,9 @@ function setup() {
   if (!id && SCHEMA[fresh.getName()] === undefined && ss.getSheets().length > 1) ss.deleteSheet(fresh);
 
   ScriptApp.getProjectTriggers().forEach(function (t) {
-    if (t.getHandlerFunction() === 'recordAbsencesToday') ScriptApp.deleteTrigger(t);
+    if (t.getHandlerFunction() === 'recordAbsencesToday_' || t.getHandlerFunction() === 'recordAbsencesToday') ScriptApp.deleteTrigger(t);
   });
-  ScriptApp.newTrigger('recordAbsencesToday').timeBased().everyMinutes(5).create();
+  ScriptApp.newTrigger('recordAbsencesToday_').timeBased().everyMinutes(5).create();
 
   Logger.log('DB 시트: ' + ss.getUrl());
 }
@@ -182,8 +182,8 @@ function result_(ok, message) {
 
 // 오늘 마감이 지난 당번 중 출석하지 않은 부원을 결석(absent)으로 기록하고 runCount를 1 올린다.
 // 같은 (부원, 날짜, 당번, 종류)는 insert_의 unique 검사로 한 번만 들어가므로 여러 번 불러도 된다.
-function recordAbsencesToday() {
-  promoteYearly();
+function recordAbsencesToday_() {
+  promoteYearly_();
   var now = new Date();
   var date = today_(now);
   var range = parseDate_(date);
@@ -235,7 +235,7 @@ function recordAbsencesToday() {
 // ---------- 화면용 API (google.script.run으로 호출) ----------
 
 function api_home() {
-  recordAbsencesToday();
+  recordAbsencesToday_();
   var date = today_();
   var current = currentShift_();
   var users = read_('User').filter(function (u) { return u.type === 1; });
@@ -328,7 +328,7 @@ function api_admin(date, token) {
     date = today;
     range = parseDate_(date);
   }
-  if (date === today) recordAbsencesToday();
+  if (date === today) recordAbsencesToday_();
   if (!range.day) return { today: today, date: date, day: 0, users: [], records: [], exempt: null };
 
   var records = read_('choolsuck')
@@ -425,7 +425,7 @@ function promote_(users, cutoffISO, nowISO) {
 }
 
 // 3월(1~31일)에 올해 진급을 아직 안 했으면 한 번만 실행한다. 5분 트리거와 화면 접속 때 확인한다.
-function promoteYearly() {
+function promoteYearly_() {
   var date = today_();
   var year = Number(date.slice(0, 4));
   if (date < year + '-03-01' || date > year + '-03-31') return;
@@ -519,7 +519,7 @@ function api_csv(from, to, token) {
 }
 
 // ---------- NEIS 학사일정 ----------
-// 스크립트 속성: NEIS_KEY(필수). ATPT_CODE, SCHUL_CODE는 findSchool()을 한 번 실행하면 자동으로 저장된다.
+// 스크립트 속성: NEIS_KEY(필수). ATPT_CODE, SCHUL_CODE는 findSchool_()을 한 번 실행하면 자동으로 저장된다.
 
 var SCHOOL_NAME = '창원과학고등학교';
 
@@ -552,7 +552,7 @@ function neisRows_(data, service) {
 }
 
 // 에디터에서 한 번 실행: 학교 코드를 찾아 스크립트 속성(ATPT_CODE, SCHUL_CODE)에 저장한다
-function findSchool() {
+function findSchool_() {
   var r = neisRows_(neis_('schoolInfo', { SCHUL_NM: SCHOOL_NAME }), 'schoolInfo');
   Logger.log(JSON.stringify(r.rows.map(function (s) { return [s.SCHUL_NM, s.ATPT_OFCDC_SC_CODE, s.SD_SCHUL_CODE, s.ORG_RDNMA]; })));
   if (r.rows.length !== 1) throw new Error('학교가 ' + r.rows.length + '개 검색되었습니다. 로그를 보고 속성을 직접 넣으세요.');
@@ -563,7 +563,7 @@ function findSchool() {
 
 function schoolParams_() {
   var props = PropertiesService.getScriptProperties();
-  if (!props.getProperty('SCHUL_CODE')) throw new Error('findSchool()을 먼저 실행하세요.');
+  if (!props.getProperty('SCHUL_CODE')) throw new Error('findSchool_()을 먼저 실행하세요.');
   return { ATPT_OFCDC_SC_CODE: props.getProperty('ATPT_CODE'), SD_SCHUL_CODE: props.getProperty('SCHUL_CODE') };
 }
 
