@@ -503,7 +503,7 @@ function api_csv(from, to, token) {
     var recorded = h >= 12 && h < 14 ? '점심' : h >= 17 && h < 19 ? '저녁' : ''; // 기록된 시각 기준
     lines.push(
       [
-        DAY_NAME[Number(Utilities.formatDate(at, TZ, 'u')) % 7],
+        DAY_NAME[r.day] || '', // 등록 시각이 아닌 실제 출석 날짜의 요일
         formatKST_(at),
         recorded,
         u.name,
