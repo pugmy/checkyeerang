@@ -75,7 +75,5 @@ function api_schoolRuleCancel(id, token) {
 function schoolExemption_(date) {
   var manual = schoolRuleEffective_(date);
   if (manual.all) return { all: true, grades: { 1: true, 2: true, 3: true }, reasons: manual.reasons };
-  var neis = exemption_(date);
-  neis.reasons = [];
-  return neis;
+  return exemption_(date);
 }
