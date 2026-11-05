@@ -286,7 +286,10 @@ function api_attend(userId, detail) {
   var current = currentShift_();
   if (!current) return result_(false, '지금은 당번 시간이 아닙니다.');
   var day = today_();
-  if (schoolRuleEffective_(day).all) return result_(false, '오늘은 출석 의무가 없는 기간입니다.');
+  var ex;
+  try { ex = schoolExemption_(day); }
+  catch (e) { ex = schoolRuleEffective_(day); }
+  if (ex.all) return result_(false, '오늘은 출석 의무가 없는 기간입니다.');
 
   return locked_(function () {
     var member = read_('User').filter(function (u) {
@@ -720,12 +723,21 @@ var GRADE_FLAG = { 1: 'ONE_GRADE_EVENT_YN', 2: 'TW_GRADE_EVENT_YN', 3: 'THREE_GR
 // rows: date부터 date+14일까지의 NEIS 학사일정 행. 반환: {all, grades: {1,2,3}}
 function exemptFrom_(rows, date) {
   var ymd = date.replace(/-/g, '');
-  var ex = { all: false, grades: { 1: false, 2: false, 3: false } };
+  var ex = { all: false, grades: { 1: false, 2: false, 3: false }, reasons: [] };
   rows.forEach(function (r) {
     // 오늘부터 14일 안에 시험일이 있으면 시험 2주 전이거나 시험 기간 중이다
-    if (String(r.EVENT_NM).indexOf(EXAM_WORD) >= 0) ex.all = true;
+    if (String(r.EVENT_NM).indexOf(EXAM_WORD) >= 0) {
+      ex.all = true;
+      if (!ex.reasons.some(function (reason) { return reason.category === 'exam'; })) {
+        ex.reasons.push({ category: 'exam', title: String(r.EVENT_NM), message: '시험 기간입니다' });
+      }
+    }
     if (r.AA_YMD !== ymd) return;
-    if (r.SBTR_DD_SC_NM === '휴업일' || r.SBTR_DD_SC_NM === '공휴일') ex.all = true;
+    if (r.SBTR_DD_SC_NM === '휴업일' || r.SBTR_DD_SC_NM === '공휴일') {
+      ex.all = true;
+      ex.reasons.push({ category: 'closed', title: String(r.EVENT_NM || r.SBTR_DD_SC_NM),
+        message: '오늘은 등교하지 않는 날입니다' });
+    }
     if (EXEMPT_EVENT_WORDS.some(function (w) { return String(r.EVENT_NM).indexOf(w) >= 0; })) {
       [1, 2, 3].forEach(function (g) { if (r[GRADE_FLAG[g]] === 'Y') ex.grades[g] = true; });
     }
