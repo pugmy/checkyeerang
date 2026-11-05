@@ -18,6 +18,14 @@ function harness(data) {
     rows[table] = rows[table].filter(r => r[field] !== value);
   };
   context.locked_ = fn => fn();
+  context.rosterRequireBaseline_ = () => {};
+  context.rosterLog_ = () => {};
+  context.update_ = (table, id, changes) => {
+    const row = rows[table].find(r => r.id === id);
+    if (!row) return "NOTFOUND";
+    Object.assign(row, changes);
+    return { ...row };
+  };
   context.requireAdmin_ = token => {
     if (token !== "test-admin-token") throw new Error("관리자 로그인이 필요합니다.");
   };
@@ -49,7 +57,9 @@ test("reject deletion if a member has attendance history", () => {
 test("allow deletion only if there is no attendance history", () => {
   const { context, rows } = harness({ User: [member] });
   assert.equal(context.api_deleteMember(1, 'test-admin-token').ok, true);
-  assert.equal(rows.User.length, 0);
+  assert.equal(rows.User.length, 1);
+  assert.equal(rows.User[0].type, -1);
+  assert.equal(context.api_members('test-admin-token').length, 0);
 });
 
 test("reject invalid member ids", () => {
