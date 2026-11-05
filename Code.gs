@@ -356,7 +356,7 @@ function api_admin(date, token) {
 
 function api_members(token) {
   requireAdmin_(token);
-  return read_('User').filter(function (u) { return u.type !== -1; }).sort(function (a, b) {
+  return read_('User').sort(function (a, b) {
     return a.day - b.day || SHIFT_ORDER[a.shift] - SHIFT_ORDER[b.shift] || byName_(a, b);
   });
 }
