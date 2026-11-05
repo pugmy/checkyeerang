@@ -487,7 +487,7 @@ function api_applyPromotion(year, expectedIds, token) {
     return result_(false, '진급 대상 학년도를 다시 확인하세요.');
   }
   if (!Array.isArray(expectedIds) || expectedIds.length > 500 ||
-      expectedIds.some(function (id) { return typeof id !== 'string' || !/^[1-9]\\d*:[123]$/.test(id); })) {
+      expectedIds.some(function (id) { return typeof id !== 'string' || !/^[1-9]\d*:[123]$/.test(id); })) {
     return result_(false, '진급 대상 명단이 올바르지 않습니다.');
   }
   return locked_(function () {
