@@ -57,3 +57,20 @@ test("audit is pure: input users and events are unchanged", () => {
   assert.equal(JSON.stringify(users), originalUsers);
   assert.equal(JSON.stringify(events), originalEvents);
 });
+
+test("detect duplicate event IDs without changing source records", () => {
+  const duplicate = { ...event, userId: 1, effectiveAt: "2026-11-04T00:00:00.000Z" };
+  const result = inspect([member], [event, duplicate]).result;
+  assert.ok(result.errors.some(e => e.code === "DUPLICATE_EVENT_ID"));
+});
+
+test("reject invalid field values in roster patches", () => {
+  const invalidShift = inspect([member], [
+    { ...event, patch: JSON.stringify({ ...JSON.parse(event.patch), shift: 99 }) },
+  ]).result;
+  assert.ok(invalidShift.errors.some(e => e.code === "INVALID_PATCH"));
+  const invalidType = inspect([member], [
+    { ...event, patch: JSON.stringify({ ...JSON.parse(event.patch), type: "deleted" }) },
+  ]).result;
+  assert.ok(invalidType.errors.some(e => e.code === "INVALID_PATCH"));
+});
