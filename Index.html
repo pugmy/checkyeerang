@@ -218,6 +218,27 @@ h2.sub {font-size:1.07rem;font-weight:700;}
 .stats dd {font-weight:730;}
 .choice {font-weight:650;}
 .detail {border-radius:.3rem;}
+/* UI 2.1 — 학생 메인 화면은 중앙 집중, 관리자 화면은 넓은 작업 공간 */
+.home-page {max-width:52rem;margin-inline:auto;}
+.home-page .date-title {text-align:center;padding:1rem .25rem 1.75rem;}
+.home-page .date-title .md {display:flex;align-items:baseline;justify-content:center;flex-wrap:wrap;gap:.15rem .75rem;}
+.home-page .date-title .md span {margin-left:0;}
+.home-page .slot-heading {justify-content:center;gap:.65rem 1rem;text-align:center;flex-wrap:wrap;}
+.home-page .slot-heading .sub {font-size:1.2rem;}
+.home-page .grid2 {
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,15rem),19.5rem));
+  justify-content:center;gap:.85rem;width:100%;margin-inline:auto;
+}
+.home-page .duty-card {width:100%;min-height:13rem;}
+.home-page .home-note {text-align:center;}
+.home-page .makeup {max-width:43rem;width:100%;margin:3.25rem auto 0;}
+.home-page > .card.big,.home-page > section > .card.big {max-width:43rem;margin-inline:auto;}
+@media(max-width:680px) {
+  .home-page .date-title {padding:.7rem .15rem 1.35rem;}
+  .home-page .grid2 {grid-template-columns:minmax(0,1fr);max-width:22rem;}
+  .home-page .slot-heading {gap:.35rem .75rem;}
+  .home-page .makeup {margin-top:2.5rem;}
+}
 /* 키오스크 안내문 — 화면의 정보 구조를 만드는 문구이며 장식용 배지가 아니다. */
 .app-eyebrow {font-size:.78rem;letter-spacing:.12em;font-weight:750;color:var(--brand);margin-bottom:.55rem;}
 .slot-heading {padding:.25rem .1rem .9rem;}
@@ -572,7 +593,7 @@ async function renderHome() {
         : h('div', { class: 'card big' }, h('p', { class: 'bold', style: 'font-size:1.25rem' }, '이번 ' + SHIFT[d.current.shift] + ' 시간에는 배정된 부원이 없습니다.')));
   }
 
-  return h('div', { class: 'stack' },
+  return h('div', { class: 'stack home-page' },
     h('h1', { class: 'sr-only' }, '출석체크'),
     h('div', { class: 'date-title' },
       h('p', { class: 'app-eyebrow' }, 'LIBRARY ATTENDANCE'),
