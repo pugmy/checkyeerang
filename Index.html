@@ -737,6 +737,13 @@ async function renderMember() {
   const alumni = all.filter((m) => m.type === 0);
   const archived = all.filter((m) => m.type === -1);
 
+  const search = h('input', { type: 'search', class: 'field',
+    placeholder: '부원 이름 검색', 'aria-label': '부원 이름 검색' });
+  const searchCount = h('p', { class: 'muted', role: 'status', style: 'font-size:.875rem' });
+  const overview = h('p', { class: 'muted', style: 'margin:.5rem 0 1rem' },
+    '재학생 ' + members.length + '명 · ' +
+    [1, 2, 3].map(g => g + '학년 ' + members.filter(m => m.grade === g).length + '명').join(' · '));
+
   const list = members.length === 0
     ? h('div', { class: 'card big' }, h('p', { class: 'bold' }, '등록된 부원이 없습니다.'), h('p', { class: 'muted', style: 'font-size:.9rem' }, '오른쪽 위 “부원 추가”로 시작해 보세요.'))
     : h('ul', { class: 'col', style: 'gap:.5rem' }, members.map((m) =>
@@ -775,11 +782,25 @@ async function renderMember() {
       return h('li', { class: 'card member' },
         nameBlock(m, '명단 제외'), h('div', { class: 'row' }, button));
     })));
+  search.addEventListener('input', () => {
+    const query = search.value.trim().toLocaleLowerCase('ko-KR');
+    let visible = 0;
+    Array.from(list.querySelectorAll('li')).forEach((item, i) => {
+      const matches = members[i].name.toLocaleLowerCase('ko-KR').includes(query);
+      item.hidden = !matches;
+      if (matches) visible++;
+    });
+    searchCount.textContent = query ? '검색 결과 ' + visible + '명' : '';
+  });
+
   return h('div', { class: 'stack' },
     h('div', { class: 'between', style: 'margin-bottom:1rem' }, h('h1', { class: 'title', style: 'margin:0' }, '부원 관리'), h('div', { class: 'row wrap' }, logoutControl(),
       h('button', { type: 'button', class: 'btn ghost sm', onclick: inspectRoster }, '이력 점검'),
       h('button', { type: 'button', class: 'btn ghost sm', onclick: openPromotion }, '학년도 진급'),
       h('button', { type: 'button', class: 'btn primary', onclick: () => memberModal() }, '+ 부원 추가'))),
+    overview,
+    search,
+    searchCount,
     list,
     graduates,
     archivedList);
