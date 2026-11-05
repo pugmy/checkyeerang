@@ -1,12 +1,15 @@
 # 도서부 출석체크
 
+> **15기 김우준 개발 브랜치 안내:** 이 브랜치는 학교 운영용이 아닙니다. 관리자 서버 인증을 포함하므로 테스트용 Apps Script와 독립된 시트를 사용하세요. 설정과 테스트 방법은 [관리자 인증 안내](docs/ADMIN_SETUP.md), 위험 및 향후 작업은 [개발 감사](docs/DEVELOPMENT_AUDIT.md)를 확인하세요. `WhoSia`의 변경은 안준표의 운영용 `main`에 자동 반영되지 않습니다.
+
+
 Google Apps Script 웹앱입니다. 화면(`Index.html`), 서버 로직(`Code.gs`), DB(구글 시트)가 모두 구글에서 돌아갑니다.
 
 ## 처음 설정
 
 1. `clasp push -f`로 올립니다. (`.clasp.json`의 `scriptId`는 직접 만들어야 합니다: `clasp create` 또는 `clasp clone <scriptId>`)
 2. 스크립트 속성에 `NEIS_KEY`(NEIS 인증키)를 추가합니다.
-3. 편집기에서 `setup`(시트·트리거 생성), `findSchool`(학교 코드 저장)을 한 번씩 실행합니다.
+3. 편집기에서 `setup_`(시트·트리거 생성), `findSchool_`(학교 코드 저장)을 한 번씩 실행합니다.
 4. 배포 → 웹 앱(실행 계정: 나, 액세스: 모든 사용자)으로 배포합니다. 코드를 고친 뒤에는 배포 관리에서 새 버전으로 올려야 반영됩니다.
 
 ## 규칙
