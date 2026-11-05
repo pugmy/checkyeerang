@@ -327,11 +327,17 @@ function api_makeup(userId, detail) {
   var date = today_();
   var today = parseDate_(date);
   if (!today.day) return result_(false, '주말에는 보충할 수 없습니다.');
-  if (schoolRuleEffective_(date).reasons.some(function (r) { return r.category === 'closed'; })) {
+  var school;
+  try { school = schoolExemption_(date); }
+  catch (e) { school = schoolRuleEffective_(date); }
+  if ((school.reasons || []).some(function (r) { return r.category === 'closed'; })) {
     return result_(false, '휴업일에는 보충 출석을 기록할 수 없습니다.');
   }
 
   return locked_(function () {
+    if (schoolRuleEffective_(date).reasons.some(function (r) { return r.category === 'closed'; })) {
+      return result_(false, '휴업일에는 보충 출석을 기록할 수 없습니다.');
+    }
     var member = read_('User').filter(function (u) { return u.type === 1 && u.id === userId; })[0];
     if (!member) return result_(false, '부원을 선택하세요.');
 
