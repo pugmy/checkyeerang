@@ -8,6 +8,8 @@ const { createHash, randomUUID } = require("node:crypto");
 const source = fs.readFileSync(path.join(__dirname, "..", "AdminAuth.gs"), "utf8");
 const code = fs.readFileSync(path.join(__dirname, "..", "Code.gs"), "utf8");
 const audit = fs.readFileSync(path.join(__dirname, "..", "RosterAudit.gs"), "utf8");
+const school = fs.readFileSync(path.join(__dirname, "..", "SchoolDays.gs"), "utf8");
+const calendar = fs.readFileSync(path.join(__dirname, "..", "Calendar.gs"), "utf8");
 const html = fs.readFileSync(path.join(__dirname, "..", "Index.html"), "utf8");
 
 function setup() {
@@ -82,8 +84,12 @@ test("maintenance entrypoints are private to Apps Script", () => {
 test("all administrative server endpoints call authorization first", () => {
   for (const name of ["api_admin", "api_members", "api_addMember", "api_updateMember",
     "api_deleteMember", "api_graduate", "api_restore", "api_csv",
-    "api_promotionPreview", "api_applyPromotion", "api_rosterAudit"]) {
-    const moduleSource = name === "api_rosterAudit" ? audit : code;
+    "api_promotionPreview", "api_applyPromotion", "api_rosterAudit",
+    "api_schoolRules", "api_schoolRuleSave", "api_schoolRuleCancel",
+    "api_excuseAbsence", "api_calendarMonth", "api_calendarAdd", "api_calendarDelete"]) {
+    const moduleSource = name === "api_rosterAudit" ? audit :
+      name.startsWith("api_school") || name === "api_excuseAbsence" ? school :
+      name.startsWith("api_calendar") ? calendar : code;
     const guard = name === "api_applyPromotion"
       ? /function api_applyPromotion\([^)]*\)\s*\{[\s\S]*?requireAdmin_\(token\)/
       : new RegExp("function\\s+" + name +
