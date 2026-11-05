@@ -29,6 +29,7 @@ function api_adminLogin(password) {
     cache.put('admin:failed', String(failed + 1), ADMIN_FAILURE_WINDOW_);
     return result_(false, '비밀번호가 올바르지 않습니다.');
   }
+  cache.remove('admin:failed');
   // 브라우저에 비밀번호를 보관하지 않고, 짧은 수명의 불투명 토큰만 전달한다.
   var token = Utilities.getUuid() + Utilities.getUuid();
   cache.put('admin:session:' + adminHash_(token), config.hash, ADMIN_SESSION_SECONDS_);
