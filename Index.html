@@ -734,7 +734,8 @@ function nameBlock(m, sub) {
 async function renderMember() {
   const all = await adminApi('api_members');
   const members = all.filter((m) => m.type === 1);
-  const alumni = all.filter((m) => m.type !== 1);
+  const alumni = all.filter((m) => m.type === 0);
+  const archived = all.filter((m) => m.type === -1);
 
   const list = members.length === 0
     ? h('div', { class: 'card big' }, h('p', { class: 'bold' }, '등록된 부원이 없습니다.'), h('p', { class: 'muted', style: 'font-size:.9rem' }, '오른쪽 위 “부원 추가”로 시작해 보세요.'))
@@ -764,13 +765,24 @@ async function renderMember() {
         h('div', { class: 'row' }, back, h('button', { type: 'button', class: 'btn danger sm', onclick: () => deleteModal(m) }, '삭제')));
     })));
 
+  const archivedList = archived.length > 0 && h('details', { class: 'mt8' },
+    h('summary', { class: 'bold', style: 'cursor:pointer;padding:.5rem 0' },
+      '명단에서 제외된 부원 (' + archived.length + '명)'),
+    h('p', { class: 'muted mt2' }, '실수로 제외한 부원은 여기서 복귀시킬 수 있습니다. 이전 시간표 기록은 유지됩니다.'),
+    h('ul', { class: 'col mt3' }, archived.map((m) => {
+      const button = h('button', { type: 'button', class: 'btn ghost sm' }, '명단에 복귀');
+      button.onclick = () => restore(button, m);
+      return h('li', { class: 'card member' },
+        nameBlock(m, '명단 제외'), h('div', { class: 'row' }, button));
+    })));
   return h('div', { class: 'stack' },
     h('div', { class: 'between', style: 'margin-bottom:1rem' }, h('h1', { class: 'title', style: 'margin:0' }, '부원 관리'), h('div', { class: 'row wrap' }, logoutControl(),
       h('button', { type: 'button', class: 'btn ghost sm', onclick: inspectRoster }, '이력 점검'),
       h('button', { type: 'button', class: 'btn ghost sm', onclick: openPromotion }, '학년도 진급'),
       h('button', { type: 'button', class: 'btn primary', onclick: () => memberModal() }, '+ 부원 추가'))),
     list,
-    graduates);
+    graduates,
+    archivedList);
 }
 
 show('home');
