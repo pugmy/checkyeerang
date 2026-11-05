@@ -435,7 +435,7 @@ function promoteYearly() {
   });
 }
 
-// 출석/보충/결석 기록이 부원을 참조하므로 함께 지운다
+// 출석 이력이 있는 부원은 삭제하지 않는다. 졸업 처리로 기록을 보존한다.
 function api_deleteMember(id) {
   id = Number(id);
   if (!Number.isSafeInteger(id) || id <= 0) return result_(false, '올바른 부원을 선택하세요.');
