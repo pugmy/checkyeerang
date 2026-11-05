@@ -19,6 +19,7 @@ function harness(data) {
   };
   context.locked_ = fn => fn();
   context.rosterRequireBaseline_ = () => {};
+  context.rosterAssertConsistent_ = () => {};
   context.rosterLog_ = () => {};
   context.update_ = (table, id, changes) => {
     const row = rows[table].find(r => r.id === id);
