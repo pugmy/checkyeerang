@@ -7,6 +7,7 @@ const { createHash, randomUUID } = require("node:crypto");
 
 const source = fs.readFileSync(path.join(__dirname, "..", "AdminAuth.gs"), "utf8");
 const code = fs.readFileSync(path.join(__dirname, "..", "Code.gs"), "utf8");
+const audit = fs.readFileSync(path.join(__dirname, "..", "RosterAudit.gs"), "utf8");
 const html = fs.readFileSync(path.join(__dirname, "..", "Index.html"), "utf8");
 
 function setup() {
@@ -68,10 +69,15 @@ test("too many failed login attempts are rejected", () => {
 });
 
 test("maintenance entrypoints are private to Apps Script", () => {
-  for (const name of ["setup", "findSchool", "recordAbsencesToday", "promoteYearly"]) {
+  for (const name of ["setup", "findSchool", "recordAbsencesToday"]) {
     assert.doesNotMatch(code, new RegExp("function\\s+" + name + "\\s*\\("));
-    assert.match(code, new RegExp("function\\s+" + name + "_\\s*\\("));
+    const moduleSource = name === "api_rosterAudit" ? audit : code;
+    assert.match(moduleSource, new RegExp("function\\s+" + name + "_\\s*\\("));
   }
+  // Manual promotion deliberately replaces the previous automatic entrypoint.
+  assert.doesNotMatch(code, /function\s+promoteYearly_?\s*\(/);
+  assert.match(code, /function\s+api_promotionPreview\s*\(/);
+  assert.match(code, /function\s+api_applyPromotion\s*\(/);
 });
 
 test("all administrative server endpoints call authorization first", () => {
