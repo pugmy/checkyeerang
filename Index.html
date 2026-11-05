@@ -402,7 +402,7 @@ async function renderHome() {
 
   let duty;
   if (!d.current) {
-    duty = h('section', { class: 'card big mt4' }, h('p', { class: 'bold', style: 'font-size:1.25rem' }, '없음'));
+    duty = h('section', { class: 'card big mt4' }, h('p', { class: 'bold', style: 'font-size:1.25rem' }, '지금은 당번 출석 시간이 아닙니다.'));
   } else {
     duty = h('section', { class: 'mt4', 'aria-labelledby': 'duty-title' },
       h('div', { class: 'between', style: 'padding:0 .25rem .75rem' },
@@ -411,7 +411,7 @@ async function renderHome() {
       d.duty.length
         ? h('ul', { class: 'grid2' }, d.duty.map((m) =>
             h('li', { class: 'card duty-card' }, h('span', { class: 'duty-name' }, m.name), attendButton(m))))
-        : h('div', { class: 'card big' }, h('p', { class: 'bold', style: 'font-size:1.25rem' }, '오늘 ' + SHIFT[d.current.shift] + ' 당번은 없어요')));
+        : h('div', { class: 'card big' }, h('p', { class: 'bold', style: 'font-size:1.25rem' }, '이번 ' + SHIFT[d.current.shift] + ' 시간에는 배정된 부원이 없습니다.')));
   }
 
   return h('div', { class: 'stack' },
@@ -441,7 +441,7 @@ async function renderAdmin() {
   const title = h('div', { class: 'between' },
     h('h1', { class: 'title' }, '출석 관리'), logoutControl());
 
-  if (!d.day) return h('div', { class: 'stack' }, title, picker, h('div', { class: 'card big mt5' }, h('p', { class: 'bold', style: 'font-size:1.1rem' }, '주말에는 당번이 없어요')));
+  if (!d.day) return h('div', { class: 'stack' }, title, picker, h('div', { class: 'card big mt5' }, h('p', { class: 'bold', style: 'font-size:1.1rem' }, '주말에는 정규 당번이 없습니다.')));
 
   const duty = d.records.filter((r) => r.kind === 'duty');
   const makeup = d.records.filter((r) => r.kind === 'makeup');
@@ -475,7 +475,7 @@ async function renderAdmin() {
     shiftSections,
     h('h2', { class: 'sec mt10' }, '보충'),
     h('ul', { class: 'col mt3', style: 'gap:.5rem' },
-      madeUp.length === 0 && h('li', { class: 'card muted' }, '보충한 부원 없음'),
+      madeUp.length === 0 && h('li', { class: 'card muted' }, '보충 출석 기록이 없습니다.'),
       madeUp.map((u) =>
         h('li', { class: 'card' },
           h('div', { class: 'between' }, nameLine(u), h('span', { class: 'pill info' }, '보충 완료')),
@@ -599,7 +599,7 @@ async function renderMember() {
   const alumni = all.filter((m) => m.type !== 1);
 
   const list = members.length === 0
-    ? h('div', { class: 'card big' }, h('p', { class: 'bold' }, '등록된 부원이 없어요'), h('p', { class: 'muted', style: 'font-size:.9rem' }, '오른쪽 위 “부원 추가”로 시작해 보세요.'))
+    ? h('div', { class: 'card big' }, h('p', { class: 'bold' }, '등록된 부원이 없습니다.'), h('p', { class: 'muted', style: 'font-size:.9rem' }, '오른쪽 위 “부원 추가”로 시작해 보세요.'))
     : h('ul', { class: 'col', style: 'gap:.5rem' }, members.map((m) =>
         h('li', { class: 'card member' },
           nameBlock(m, DAYS[m.day - 1] + '요일 · ' + SHIFT[m.shift]),
