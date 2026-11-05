@@ -20,6 +20,25 @@ Development branch: `15th-Gen-Kim-Woojun`.
 5. **Medium – NEIS reliability:** A temporary NEIS failure skips absent-record generation without an independent backfill window.
 6. **Medium – Makeup approvals:** `api_makeup` instantly increments `addCount`; no authorized approval workflow exists.
 
+## Development status (not deployed)
+
+| Area | Branch implementation | Remaining validation |
+| --- | --- | --- |
+| Admin access | Server-side authorization for all 8 privileged APIs, login, logout, short-lived cache session | Verify Script Properties and web-app browser flow in independent Apps Script deployment |
+| Maintenance API exposure | Renamed setup, NEIS setup, absence trigger and yearly promotion entrypoints with private suffix | Re-run setup_ in test script to migrate old triggers |
+| History preservation | Refuses permanent deletion when attendance history exists | Confirm operator's expectations and backup policy |
+| CSV | Filters by actual attendance date, excludes absences, uses recorded duty day | Historical grade and schedule still depend on current User row |
+| UX | Clearer empty states, deletion errors and login expiry feedback | Real browser keyboard/mobile testing |
+
+### Residual risks
+
+- A public student can still submit another student's ordinary or makeup attendance. A verified identity or administrator approval workflow is not yet implemented.
+- Admin credentials use a random high-entropy password and salted SHA-256 hash; a predictable or reused password would not meet the design assumption.
+- Failed login counters live in a shared, best-effort Apps Script cache. This is not a robust distributed anti-abuse service and can temporarily lock out the administrator.
+- Session cache eviction can end an administrator session before four hours.
+- Historic roster, grade and shift values are not fully snapshotted. Past reports may change when the current roster is edited.
+- Google Apps Script deployments are versioned separately from GitHub: pushing a branch does not update the deployed web app.
+
 ## Proposed validation
 
 - Add Node-based, dependency-free tests that stub Apps Script global services and in-memory sheets.
