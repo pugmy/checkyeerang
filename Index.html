@@ -972,6 +972,7 @@ async function renderAdmin() {
   const duty = d.records.filter((r) => r.kind === 'duty');
   const makeup = d.records.filter((r) => r.kind === 'makeup');
   const absent = d.records.filter((r) => r.kind === 'absent');
+  const excused = d.records.filter((r) => r.kind === 'excused');
   const onDuty = d.users.filter((u) => u.day === d.day);
   const madeUp = d.users.filter((u) => makeup.some((r) => r.userId === u.id));
   const weekday = DAYS[d.day - 1];
@@ -986,17 +987,38 @@ async function renderAdmin() {
       members.length === 0
         ? h('p', { class: 'card muted' }, '당번 없음')
         : h('ul', { class: 'col', style: 'gap:.5rem' }, members.map((u) => {
-            const rec = duty.find((r) => r.userId === u.id);
-            const miss = absent.some((a) => a.userId === u.id && a.shift === shift);
-            // 휴업일, 시험 기간 등 학사일정 때문에 결석을 기록하지 않는 날
-            const free = !rec && !miss && d.exempt && (d.exempt.all || d.exempt.grades[u.grade]);
+            const rec = duty.find((r) => r.userId === u.id && r.shift === shift);
+            const miss = absent.find((r) => r.userId === u.id && r.shift === shift);
+            const corrected = excused.find((r) => r.userId === u.id && r.shift === shift);
+            const exempt = d.exempt && (d.exempt.all || d.exempt.grades[u.grade]);
+            const free = !rec && !miss && !corrected && exempt;
+            const review = !!miss && !!exempt;
+            const badge = rec ? '출석' : corrected ? '면제 정정' :
+              review ? '면제 정정 필요' : miss ? '결석' : free ? '면제' : '미출석';
+            const correctionButton = review && h('button', {
+              type: 'button', class: 'btn ghost sm',
+              onclick: async () => {
+                if (!confirm(u.name + ' 학생의 ' + d.date + ' 결석을 면제로 정정할까요?')) return;
+                try {
+                  const result = await adminApi('api_excuseAbsence', miss.id);
+                  if (result.ok) show('admin'); else alert(result.message);
+                } catch (e) { alert(errText(e)); }
+              }
+            }, '면제 정정');
             return h('li', { class: 'card' },
-              h('div', { class: 'between' }, nameLine(u), h('span', { class: 'pill ' + (rec ? 'ok' : miss ? 'bad' : free ? 'info' : 'idle') }, rec ? '출석' : miss ? '결석' : free ? '면제' : '미출석')),
-              rec && rec.detail && detailLine(rec.detail));
+              h('div', { class: 'between' }, nameLine(u),
+                h('div', { class: 'row wrap' },
+                  h('span', { class: 'pill ' + (rec ? 'ok' : miss && !review ? 'bad' : free || corrected || review ? 'info' : 'idle') }, badge),
+                  correctionButton)),
+              rec && rec.detail && detailLine(rec.detail),
+              corrected && h('p', { class: 'muted' }, '관리자가 면제로 정정한 기록입니다.'));
           })));
   });
 
   return h('div', { class: 'stack' }, title, picker, historyNotice,
+    d.exempt?.all && h('p', { class: 'school-notice', role: 'status' },
+      d.exempt.reasons?.some(r => r.category === 'exam') ? '시험 기간입니다' : '출석 의무가 없는 날입니다',
+      h('small', {}, (d.exempt.reasons || []).map(r => r.title).join(' · '))),
     h('h2', { class: 'sec mt8' }, d.date + ' ', h('span', { class: 'name-sub', style: 'font-size:inherit;font-weight:800;color:var(--brand)' }, '(' + weekday + ')'), ' 당번'),
     shiftSections,
     h('h2', { class: 'sec mt10' }, '보충'),
