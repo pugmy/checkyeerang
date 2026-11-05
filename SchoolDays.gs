@@ -77,3 +77,42 @@ function schoolExemption_(date) {
   if (manual.all) return { all: true, grades: { 1: true, 2: true, 3: true }, reasons: manual.reasons };
   return exemption_(date);
 }
+
+
+function api_excuseAbsence(absenceId, token) {
+  requireAdmin_(token);
+  absenceId = Number(absenceId);
+  if (!Number.isSafeInteger(absenceId) || absenceId <= 0) {
+    return result_(false, '정정할 출석 기록을 확인해 주세요.');
+  }
+  return locked_(function () {
+    var record = read_('choolsuck').filter(function (r) { return r.id === absenceId; })[0];
+    if (!record || record.kind !== 'absent') {
+      return result_(false, '정정할 결석 기록이 없습니다.');
+    }
+    var users = read_('User');
+    var member = users.filter(function (u) { return u.id === record.userId; })[0];
+    if (!member) return result_(false, '부원 정보를 찾을 수 없습니다.');
+    var ex = schoolExemption_(record.date);
+    if (!isExempt_(ex, member.grade)) {
+      return result_(false, '해당 날짜에는 면제 규칙이 없습니다. 먼저 달력에서 등교·시험 일정을 확인해 주세요.');
+    }
+    if (member.runCount < 1) {
+      return result_(false, '결석 횟수가 기록과 일치하지 않습니다. 원본 시트를 확인해 주세요.');
+    }
+    var reason = (ex.reasons || []).map(function (r) { return r.title; }).join(', ') || '학사일정 면제';
+    // 원래 결석 기록의 날짜와 ID는 남기고, 변경을 별도 행으로 보존한다.
+    insert_('AttendanceCorrections', { absenceId: record.id, userId: record.userId,
+      date: record.date, shift: record.shift, reason: reason });
+    var updated = update_('choolsuck', record.id, {
+      kind: 'excused',
+      detail: ('면제 정정: ' + reason + (record.detail ? ' / 기존 메모: ' + record.detail : '')).slice(0, 1000)
+    });
+    if (updated === 'NOTFOUND') throw new Error('정정 대상이 사라졌습니다. 감사 기록을 확인해 주세요.');
+    var count = update_('User', member.id, null, { runCount: -1 });
+    if (count === 'NOTFOUND') {
+      throw new Error('결석 기록을 수정했지만 부원 횟수 갱신에 실패했습니다. 관리자 점검이 필요합니다.');
+    }
+    return result_(true, '결석을 면제로 정정했습니다. 변경 내역은 별도 기록에 보존됩니다.');
+  });
+}
