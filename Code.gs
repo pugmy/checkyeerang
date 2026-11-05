@@ -333,7 +333,7 @@ function api_admin(date, token) {
     range = parseDate_(date);
   }
   if (date === today) recordAbsencesToday_();
-  if (!range.day) return { today: today, date: date, day: 0, users: [], records: [], exempt: null };
+  if (!range.day) return { today: today, date: date, day: 0, users: [], rosterByShift: {}, rosterVerified: true, records: [], exempt: null };
 
   var records = read_('choolsuck')
     .filter(function (r) { return r.date === date; })
@@ -342,10 +342,12 @@ function api_admin(date, token) {
   try {
     exempt = exemption_(date);
   } catch (e) {} // 학사일정을 못 읽어도 출석 화면은 보여 준다(면제 표시만 빠진다)
-  var users = read_('User').filter(function (u) {
-    return u.type === 1 || records.some(function (r) { return r.userId === u.id; });
-  });
-  return { today: today, date: date, day: range.day, users: users.sort(byName_), records: records, exempt: exempt };
+  var view = rosterDayView_(date, read_('User'), records);
+  return {
+    today: today, date: date, day: range.day,
+    users: view.users, rosterByShift: view.shifts,
+    rosterVerified: view.verified, records: records, exempt: exempt,
+  };
 }
 
 function api_members(token) {
