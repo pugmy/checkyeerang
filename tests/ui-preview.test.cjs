@@ -58,6 +58,7 @@ test("UI has labeled navigation, keyboard focus and reduced-motion handling", ()
 test("preview supports several kiosk display conditions without real student data", () => {
   const builder = fs.readFileSync(builderPath, "utf8");
   assert.match(builder, /value="regular"/);
+  assert.match(builder, /value="single"/);
   assert.match(builder, /value="crowded"/);
   assert.match(builder, /value="empty"/);
   assert.match(builder, /value="closed"/);
@@ -73,4 +74,20 @@ test("viewport, Korean document title and authoritative day are provided", () =>
   assert.match(html, /new Date\(d\.today \+ 'T12:00:00\+09:00'\)/);
   assert.match(html, /class: 'member-roster'/);
   assert.match(html, /\.member-roster/);
+});
+
+test("student home uses a centered layout independently of administrator pages", () => {
+  const html = fs.readFileSync(htmlPath, "utf8");
+  const stylesheet = html.match(/<style>([\s\S]*?)<\/style>/)?.[1] || "";
+  const client = html.match(/<script>([\s\S]*?)<\/script>\s*<\/body>/)?.[1] || "";
+  assert.match(client, /class: 'stack home-page'/);
+  assert.match(stylesheet, /\.home-page \{max-width:52rem;margin-inline:auto;/);
+  assert.match(stylesheet, /\.home-page \.date-title \{text-align:center/);
+  assert.match(stylesheet, /\.home-page \.slot-heading \{justify-content:center/);
+  assert.match(stylesheet, /\.home-page \.grid2 \{/);
+  assert.match(stylesheet, /justify-content:center;gap:\.85rem;width:100%;margin-inline:auto;/);
+  assert.match(stylesheet, /\.home-page \.makeup \{max-width:43rem;width:100%;margin:3\.25rem auto 0;/);
+  assert.match(stylesheet, /\.home-page \.grid2 \{grid-template-columns:minmax\(0,1fr\);max-width:22rem;/);
+  assert.match(stylesheet, /\.member-roster \{display:grid;/);
+  assert.doesNotMatch(stylesheet, /main\s*\{[^}]*max-width:52rem/);
 });
