@@ -14,8 +14,9 @@ var SCHEMA = {
   User: ['id', 'name', 'grade', 'day', 'shift', 'workCount', 'addCount', 'runCount', 'createdAt', 'updatedAt', 'type'], // type: -1 명단 제외, 0 졸업생, 1 재학생
   choolsuck: ['id', 'userId', 'day', 'shift', 'kind', 'date', 'detail', 'createdAt', 'updatedAt'],
   RosterHistory: ['id', 'userId', 'effectiveAt', 'patch', 'createdAt'],
+  CalendarNotes: ['id', 'date', 'category', 'title', 'detail', 'userId', 'createdAt', 'updatedAt'],
 };
-var TEXT_COLS = ['name', 'kind', 'date', 'detail', 'createdAt', 'updatedAt', 'effectiveAt', 'patch'];
+var TEXT_COLS = ['name', 'kind', 'date', 'detail', 'createdAt', 'updatedAt', 'effectiveAt', 'patch', 'category', 'title'];
 
 // ---------- 진입점 / 설치 ----------
 
