@@ -477,12 +477,14 @@ function api_csv(from, to) {
   if (!f || !t) return { ok: false, message: '시작일과 종료일을 올바르게 입력하세요.' };
   if (t.start < f.start) return { ok: false, message: '종료일이 시작일보다 빠릅니다.' };
 
-  var start = f.start.toISOString();
-  var end = t.end.toISOString();
   var users = {};
   read_('User').forEach(function (u) { users[u.id] = u; });
+  // 출석일 기준으로 조회한다. 저장 시각(createdAt)은 일시 표시용이다.
   var records = read_('choolsuck')
-    .filter(function (r) { return r.createdAt >= start && r.createdAt < end && users[r.userId]; })
+    .filter(function (r) {
+      return r.date >= from && r.date <= to &&
+        (r.kind === 'duty' || r.kind === 'makeup') && !!users[r.userId];
+    })
     .sort(function (a, b) { return a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : a.id - b.id; });
 
   var lines = [['요일', '일시', '시간', '이름', '학년', '구분', '담당 요일', '담당 시간', '특이사항'].map(cell_).join(',')];
