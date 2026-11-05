@@ -30,6 +30,7 @@ const mocks = String.raw`<script>
     api_home: () => {
       const dutyMembers = scenario === 'crowded'
         ? roster.filter(m => m.type === 1 && m.day === 5 && m.shift === 1).concat(crowded)
+        : scenario === 'single' ? roster.filter(m => m.id === 101)
         : scenario === 'empty' ? [] : roster.filter(m => m.type === 1 && m.day === 5 && m.shift === 1);
       return {
         today, current: scenario === 'closed' ? null : { day: 5, shift: 1 },
@@ -109,6 +110,7 @@ const mocks = String.raw`<script>
   <label for="preview-scenario">화면 테스트</label>
   <select id="preview-scenario" aria-label="가상 출석 화면 조건">
     <option value="regular">정상 출석 시간</option>
+    <option value="single">당번 1명</option>
     <option value="crowded">당번 8명</option>
     <option value="empty">배정된 당번 없음</option>
     <option value="closed">출석 시간 외</option>
