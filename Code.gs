@@ -13,8 +13,9 @@ var SHIFT_ORDER = { 1: 1, 3: 2, 2: 3 }; // 목록 정렬용: 점심 전, 점심 
 var SCHEMA = {
   User: ['id', 'name', 'grade', 'day', 'shift', 'workCount', 'addCount', 'runCount', 'createdAt', 'updatedAt', 'type'], // type: 0 졸업생, 1 재학생
   choolsuck: ['id', 'userId', 'day', 'shift', 'kind', 'date', 'detail', 'createdAt', 'updatedAt'],
+  RosterHistory: ['id', 'userId', 'effectiveAt', 'patch', 'createdAt'],
 };
-var TEXT_COLS = ['name', 'kind', 'date', 'detail', 'createdAt', 'updatedAt'];
+var TEXT_COLS = ['name', 'kind', 'date', 'detail', 'createdAt', 'updatedAt', 'effectiveAt', 'patch'];
 
 // ---------- 진입점 / 설치 ----------
 
@@ -43,6 +44,9 @@ function setup_() {
     });
   });
   if (!id && SCHEMA[fresh.getName()] === undefined && ss.getSheets().length > 1) ss.deleteSheet(fresh);
+
+  // 기존 부원 상태를 한 번 봉인한다. 이전 시점은 검증된 이력으로 간주하지 않는다.
+  rosterBaseline_();
 
   ScriptApp.getProjectTriggers().forEach(function (t) {
     if (t.getHandlerFunction() === 'recordAbsencesToday_' || t.getHandlerFunction() === 'recordAbsencesToday') ScriptApp.deleteTrigger(t);
