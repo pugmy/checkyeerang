@@ -148,8 +148,9 @@ function rosterSaveEventOrRollback_(before, after) {
 }
 
 function rosterPromoteOrRollback_(previous, current, changes, stamp) {
-  writeAll_('User', current);
   try {
+    // 최신 상태 쓰기 자체가 일부 성공한 후 실패한 경우도 보상 대상이다.
+    writeAll_('User', current);
     rosterWriteEvents_(changes, stamp);
   } catch (writeError) {
     try {
