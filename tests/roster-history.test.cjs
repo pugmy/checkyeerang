@@ -109,3 +109,40 @@ test("record snapshots do not overwrite old schedule with current user values", 
   assert.equal(student.day, 1);
   assert.equal(h.events.length, 2);
 });
+
+test("different shifts on one day retain their own historical assignments", () => {
+  const h = harness([student]);
+  h.props.ROSTER_BASELINE_AT = "2026-11-01T00:00:00.000Z";
+  h.events.push({
+    id: 1, userId: 7, effectiveAt: "2026-11-01T00:00:00.000Z",
+    patch: JSON.stringify({ name: "테스트학생", grade: 2, day: 1, shift: 1, type: 1 }),
+    createdAt: "2026-11-01T00:00:00.000Z",
+  });
+  h.events.push({
+    id: 2, userId: 7, effectiveAt: "2026-11-09T04:05:00.000Z", // 13:05 KST
+    patch: JSON.stringify({ shift: 3 }),
+    createdAt: "2026-11-09T04:05:00.000Z",
+  });
+  const view = h.context.rosterDayView_("2026-11-09", [student], []);
+  assert.equal(view.verified, true);
+  assert.equal(view.shifts[1].length, 1); // 13:00 before changing to shift 3
+  assert.equal(view.shifts[3].length, 1); // 13:20 after the change
+  assert.equal(view.shifts[2].length, 0);
+});
+
+test("CSV lookup uses the old schedule for an earlier duty", () => {
+  const h = harness([student]);
+  h.props.ROSTER_BASELINE_AT = "2026-11-01T00:00:00.000Z";
+  h.events.push({
+    id: 1, userId: 7, effectiveAt: "2026-11-01T00:00:00.000Z",
+    patch: JSON.stringify({ name: "테스트학생", grade: 2, day: 1, shift: 1, type: 1 }),
+  });
+  h.events.push({
+    id: 2, userId: 7, effectiveAt: "2026-11-09T04:05:00.000Z",
+    patch: JSON.stringify({ shift: 3 }),
+  });
+  const result = h.context.rosterForRecord_(h.context.rosterIndex_(),
+    { userId: 7, date: "2026-11-09", shift: 1 }, { ...student, shift: 3 });
+  assert.equal(result.verified, true);
+  assert.equal(result.user.shift, 1);
+});
