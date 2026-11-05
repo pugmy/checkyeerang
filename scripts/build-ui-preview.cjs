@@ -22,14 +22,22 @@ const mocks = String.raw`<script>
   ];
   const attended = new Set([102]);
   const today = '2026-11-06';
+  let scenario = 'regular';
+  const crowded = ['예시 학생 E', '예시 학생 F', '예시 학생 G', '예시 학생 H', '예시 학생 I', '예시 학생 J']
+    .map((name, i) => ({ id: 200 + i, name, grade: i % 3 + 1, day: 5, shift: 1, type: 1,
+      workCount: 1, addCount: 0, runCount: 0 }));
   const server = {
-    api_home: () => ({
-      today, current: { day: 5, shift: 1 },
-      duty: roster.filter(m => m.type === 1 && m.day === 5 && m.shift === 1)
-        .map(m => ({ id: m.id, name: m.name, attended: attended.has(m.id) })),
-      makeup: roster.filter(m => m.type === 1)
-        .map(m => ({ id: m.id, name: m.name, grade: m.grade, onDuty: m.day === 5 && m.shift === 1 }))
-    }),
+    api_home: () => {
+      const dutyMembers = scenario === 'crowded'
+        ? roster.filter(m => m.type === 1 && m.day === 5 && m.shift === 1).concat(crowded)
+        : scenario === 'empty' ? [] : roster.filter(m => m.type === 1 && m.day === 5 && m.shift === 1);
+      return {
+        today, current: scenario === 'closed' ? null : { day: 5, shift: 1 },
+        duty: dutyMembers.map(m => ({ id: m.id, name: m.name, attended: attended.has(m.id) })),
+        makeup: roster.filter(m => m.type === 1)
+          .map(m => ({ id: m.id, name: m.name, grade: m.grade, onDuty: m.day === 5 && m.shift === 1 }))
+      };
+    },
     api_adminLogin: () => ({ ok: true, token: 'preview-session-not-real' }),
     api_adminLogout: () => ({ ok: true }),
     api_admin: (date) => ({
@@ -74,6 +82,15 @@ const mocks = String.raw`<script>
     });
   }
   window.google = { script: { run: runner(null, null) } };
+  // Preview controls are injected outside the production UI and never sent to Google.
+  document.addEventListener('DOMContentLoaded', () => {
+    const selector = document.getElementById('preview-scenario');
+    if (!selector) return;
+    selector.addEventListener('change', () => {
+      scenario = selector.value;
+      if (typeof show === 'function') show('home');
+    });
+  });
 })();
 </script>
 <style>
@@ -81,11 +98,22 @@ const mocks = String.raw`<script>
   position:fixed;right:1rem;bottom:1rem;z-index:40;
   padding:.55rem .8rem;background:#202d3a;color:#fff;
   font:600 12px/1.4 system-ui,sans-serif;border-radius:6px;
-  box-shadow:0 3px 14px #0002;pointer-events:none;
+  box-shadow:0 3px 14px #0002;display:flex;flex-direction:column;gap:.25rem;max-width:17rem;
 }
+.preview-banner label {font-weight:700;}
+.preview-banner small {color:#d7e5e0;}
+.preview-banner select {font:inherit;padding:.35rem;border-radius:.35rem;border:1px solid #aab8b1;background:white;color:#202d3a;}
+@media(max-width:500px) {.preview-banner {left:1rem;right:1rem;bottom:.5rem;max-width:none;}}
 </style>
 <div class="preview-banner" aria-label="테스트 데이터 미리보기">
-  LOCAL PREVIEW · 가상 데이터 · 서버 연결 없음
+  <label for="preview-scenario">화면 테스트</label>
+  <select id="preview-scenario" aria-label="가상 출석 화면 조건">
+    <option value="regular">정상 출석 시간</option>
+    <option value="crowded">당번 8명</option>
+    <option value="empty">배정된 당번 없음</option>
+    <option value="closed">출석 시간 외</option>
+  </select>
+  <small>가상 데이터 · 실제 서버 연결 없음</small>
 </div>`;
 const output = index.replace(include, logo + "\n" + mocks);
 const destination = path.join(root, "preview-ui.html");
