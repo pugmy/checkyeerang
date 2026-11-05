@@ -171,6 +171,40 @@ const api = (fn, ...args) =>
 
 const errText = (e) => '서버 오류가 발생했습니다. 잠시 후 다시 시도하세요. (' + ((e && e.message) || e) + ')';
 
+// 관리자 토큰은 메모리에만 보관한다. 탭/브라우저를 닫으면 다시 로그인해야 한다.
+let adminToken = '';
+const adminApi = (name, ...args) => api(name, ...args, adminToken);
+async function logoutAdmin() {
+  const token = adminToken;
+  adminToken = '';
+  try { await api('api_adminLogout', token); } catch (_) { /* 화면에서 세션은 즉시 폐기 */ }
+  show('home');
+}
+function adminLoginView(destination) {
+  const password = h('input', { type: 'password', class: 'field', autocomplete: 'current-password',
+    'aria-label': '관리자 비밀번호' });
+  const message = h('p', { class: 'msg bad-text', role: 'alert' });
+  const submit = h('button', { type: 'submit', class: 'btn primary lg' }, '로그인');
+  const form = h('form', { class: 'col', onsubmit: async (event) => {
+    event.preventDefault();
+    let response;
+    try { response = await busy(submit, '확인 중...', () => api('api_adminLogin', password.value)); }
+    catch (e) { response = { ok: false, message: errText(e) }; }
+    password.value = '';
+    if (!response.ok) { message.textContent = response.message; return; }
+    adminToken = response.token;
+    show(destination);
+  } });
+  form.append(h('label', { class: 'label' }, '관리자 비밀번호', password), message, submit);
+  return h('section', { class: 'card stack mt5', style: 'gap:1rem' },
+    h('h1', { class: 'title', style: 'margin:0' }, '관리자 로그인'),
+    h('p', { class: 'muted' }, '출석 및 부원 관리는 도서부 담당자만 사용할 수 있습니다.'),
+    form);
+}
+function logoutControl() {
+  return h('button', { type: 'button', class: 'btn ghost sm', onclick: logoutAdmin }, '로그아웃');
+}
+
 const svg = (d, cls) => {
   const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   s.setAttribute('viewBox', '0 0 20 20');
@@ -253,7 +287,7 @@ async function show(name) {
   nav.querySelector('[data-tab="' + name + '"]').setAttribute('aria-current', 'page');
   main.replaceChildren(skeleton('1.5rem', '9rem', '3rem'));
   try {
-    const el = await tabs[name][1]();
+    const el = name !== 'home' && !adminToken ? adminLoginView(name) : await tabs[name][1]();
     if (mine === token) main.replaceChildren(el);
   } catch (e) {
     if (mine === token) main.replaceChildren(h('div', { class: 'card big' }, h('p', { class: 'bad-text bold' }, errText(e)), h('button', { class: 'btn ghost mt4', onclick: () => show(name) }, '다시 시도')));
@@ -396,7 +430,7 @@ function detailLine(text) { return h('p', { class: 'detail' }, '특이사항: ' 
 function nameLine(u) { return h('span', { class: 'bold' }, u.name, ' ', h('span', { class: 'name-sub' }, u.grade + '학년')); }
 
 async function renderAdmin() {
-  const d = await api('api_admin', adminDate);
+  const d = await adminApi('api_admin', adminDate);
   adminDate = d.date;
   const picker = h('div', { class: 'row wrap' },
     h('input', {
@@ -404,7 +438,8 @@ async function renderAdmin() {
       onchange: (e) => { if (e.target.value) { adminDate = e.target.value; show('admin'); } },
     }),
     h('button', { type: 'button', class: 'btn ghost', onclick: () => csvModal(d.today) }, 'CSV 내보내기'));
-  const title = h('h1', { class: 'title' }, '출석 관리');
+  const title = h('div', { class: 'between' },
+    h('h1', { class: 'title' }, '출석 관리'), logoutControl());
 
   if (!d.day) return h('div', { class: 'stack' }, title, picker, h('div', { class: 'card big mt5' }, h('p', { class: 'bold', style: 'font-size:1.1rem' }, '주말에는 당번이 없어요')));
 
@@ -457,7 +492,7 @@ function csvModal(today) {
       msg.textContent = '';
       if (!from.value || !to.value || to.value < from.value) { msg.textContent = '종료일은 시작일 이후여야 합니다.'; return; }
       let r;
-      try { r = await busy(go, '만드는 중...', () => api('api_csv', from.value, to.value)); }
+      try { r = await busy(go, '만드는 중...', () => adminApi('api_csv', from.value, to.value)); }
       catch (e) { msg.textContent = errText(e); return; }
       if (!r.ok) { msg.textContent = r.message; return; }
       // BOM을 붙여야 엑셀에서 한글이 깨지지 않는다
@@ -486,7 +521,7 @@ function memberModal(member) {
     save.onclick = async () => {
       const data = { name: name.value, grade: f.grade, day: f.day, shift: f.shift };
       let r;
-      try { r = await busy(save, '저장 중...', () => (member ? api('api_updateMember', member.id, data) : api('api_addMember', data))); }
+      try { r = await busy(save, '저장 중...', () => (member ? adminApi('api_updateMember', member.id, data) : adminApi('api_addMember', data))); }
       catch (e) { r = { ok: false, message: errText(e) }; }
       if (r.ok) { close(); show('member'); } else msg.textContent = r.message;
     };
@@ -511,7 +546,7 @@ function deleteModal(m) {
       pending = true;
       cancel.disabled = true;
       let result;
-      try { result = await busy(del, '삭제 중...', () => api('api_deleteMember', m.id)); }
+      try { result = await busy(del, '삭제 중...', () => adminApi('api_deleteMember', m.id)); }
       catch (e) { result = { ok: false, message: errText(e) }; }
       pending = false;
       cancel.disabled = false;
@@ -534,7 +569,7 @@ function graduateModal(m) {
     go.onclick = async () => {
       pending = true;
       cancel.disabled = true;
-      try { await busy(go, '처리 중...', () => api('api_graduate', m.id)); }
+      try { await busy(go, '처리 중...', () => adminApi('api_graduate', m.id)); }
       catch (e) { alert(errText(e)); }
       pending = false;
       close();
@@ -559,7 +594,7 @@ function nameBlock(m, sub) {
 }
 
 async function renderMember() {
-  const all = await api('api_members');
+  const all = await adminApi('api_members');
   const members = all.filter((m) => m.type === 1);
   const alumni = all.filter((m) => m.type !== 1);
 
@@ -576,7 +611,7 @@ async function renderMember() {
 
   const restore = async (btn, m) => {
     let r;
-    try { r = await busy(btn, '처리 중...', () => api('api_restore', m.id)); }
+    try { r = await busy(btn, '처리 중...', () => adminApi('api_restore', m.id)); }
     catch (e) { r = { ok: false, message: errText(e) }; }
     if (r.ok) show('member'); else alert(r.message);
   };
@@ -592,7 +627,7 @@ async function renderMember() {
     })));
 
   return h('div', { class: 'stack' },
-    h('div', { class: 'between', style: 'margin-bottom:1rem' }, h('h1', { class: 'title', style: 'margin:0' }, '부원 관리'), h('button', { type: 'button', class: 'btn primary', onclick: () => memberModal() }, '+ 부원 추가')),
+    h('div', { class: 'between', style: 'margin-bottom:1rem' }, h('h1', { class: 'title', style: 'margin:0' }, '부원 관리'), h('div', { class: 'row' }, logoutControl(), h('button', { type: 'button', class: 'btn primary', onclick: () => memberModal() }, '+ 부원 추가'))),
     list,
     graduates);
 }
