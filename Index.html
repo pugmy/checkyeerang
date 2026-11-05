@@ -257,6 +257,14 @@ h2.sub {font-size:1.07rem;font-weight:700;}
   .promotion-choice {flex:0 0 8.3rem;}
   .promotion-row {gap:.45rem;}
 }
+.site-credits {display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:.35rem .8rem;line-height:1.6;}
+.credits-label {font-weight:650;color:var(--muted);}
+.credit-person {display:inline-flex;align-items:baseline;gap:.4rem;white-space:nowrap;color:var(--ink);font-weight:550;}
+.credit-person a {font-size:.8rem;font-weight:650;color:var(--brand);text-decoration:none;border-bottom:1px solid transparent;}
+.credit-person a:hover {border-color:currentColor;}
+.credit-person a:focus-visible {outline:2px solid var(--brand);outline-offset:3px;border-radius:2px;}
+.credits-divider {color:var(--muted);}
+@media(max-width:450px) {.credits-divider {display:none;}.credits-label {flex-basis:100%;}}
 /* UI 2.1 — 학생 메인 화면은 중앙 집중, 관리자 화면은 넓은 작업 공간 */
 .home-page {max-width:52rem;margin-inline:auto;}
 .home-page .date-title {text-align:center;padding:1rem .25rem 1.75rem;}
@@ -304,7 +312,12 @@ h2.sub {font-size:1.07rem;font-weight:700;}
   <nav id="nav" aria-label="주 메뉴"></nav>
 </header>
 <main id="main"></main>
-<footer>개발 · 15기 김우준 · 16기 안준표</footer>
+<footer class="site-credits" aria-label="개발 참여자">
+  <span class="credits-label">개발</span>
+  <span class="credit-person">15기 김우준 <a href="https://github.com/WhoSia" target="_blank" rel="noopener noreferrer" aria-label="김우준 GitHub WhoSia">@WhoSia</a></span>
+  <span class="credits-divider" aria-hidden="true">·</span>
+  <span class="credit-person">16기 안준표 <a href="https://github.com/pugmy" target="_blank" rel="noopener noreferrer" aria-label="안준표 GitHub pugmy">@pugmy</a></span>
+</footer>
 
 <?!= HtmlService.createHtmlOutputFromFile('Logo').getContent(); ?>
 <script>
