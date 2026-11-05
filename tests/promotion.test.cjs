@@ -113,3 +113,53 @@ test("history write failure leaves review marker to prevent accidental repeat", 
   assert.equal(h.props.PROMOTION_PENDING_YEAR, String(YEAR));
   assert.equal(h.context.api_applyPromotion(YEAR, ["1:2", "2:3"], "valid-admin").ok, false);
 });
+
+test("individual decisions include early graduation, exclusion and no change", () => {
+  const h = harness();
+  const decisions = [
+    { id: 1, action: "graduate" },
+    { id: 2, action: "keep" },
+  ];
+  const result = h.context.api_applyPromotion(YEAR, ["1:2", "2:3"], decisions, "valid-admin");
+  assert.equal(result.ok, true);
+  assert.equal(h.users()[0].type, 0);
+  assert.equal(h.users()[0].grade, 2);
+  assert.equal(h.users()[1].type, 1);
+  assert.equal(h.users()[1].grade, 3);
+  assert.equal(h.users()[2].grade, 1);
+  assert.equal(h.records.length, 1);
+});
+
+test("can exclude one existing student without deleting attendance history", () => {
+  const h = harness();
+  const result = h.context.api_applyPromotion(YEAR, ["1:2", "2:3"], [
+    { id: 1, action: "exclude" }, { id: 2, action: "graduate" }
+  ], "valid-admin");
+  assert.equal(result.ok, true);
+  assert.equal(h.users()[0].type, -1);
+  assert.equal(h.users()[1].type, 0);
+  assert.equal(h.records[0].changes.some(x => x.userId === 1 && x.patch.type === -1), true);
+});
+
+test("reject unauthorized decisions, duplicate IDs and invalid fourth-year promotion", () => {
+  const cases = [
+    [{ id: 999, action: "graduate" }],
+    [{ id: 1, action: "graduate" }, { id: 1, action: "exclude" }],
+    [{ id: 2, action: "promote" }],
+    [{ id: 1, action: "delete" }],
+  ];
+  cases.forEach(decisions => {
+    const h = harness();
+    const response = h.context.api_applyPromotion(YEAR, ["1:2", "2:3"], decisions, "valid-admin");
+    assert.equal(response.ok, false);
+    assert.equal(h.records.length, 0);
+    assert.equal(h.props.PROMOTION_PENDING_YEAR, undefined);
+  });
+});
+
+test("individual review never bypasses administrator authentication", () => {
+  const h = harness();
+  assert.throws(() => h.context.api_applyPromotion(YEAR, ["1:2", "2:3"],
+    [{ id: 1, action: "graduate" }], "wrong-token"), /관리자/);
+  assert.equal(h.records.length, 0);
+});
