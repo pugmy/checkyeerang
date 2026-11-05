@@ -26,15 +26,63 @@ const mocks = String.raw`<script>
   const crowded = ['예시 학생 E', '예시 학생 F', '예시 학생 G', '예시 학생 H', '예시 학생 I', '예시 학생 J']
     .map((name, i) => ({ id: 200 + i, name, grade: i % 3 + 1, day: 5, shift: 1, type: 1,
       workCount: 1, addCount: 0, runCount: 0 }));
+  let mockRules = [
+    { id: 1, category: 'closed', title: '학교 재량휴업일', startDate: '2026-11-12', endDate: '2026-11-12' },
+    { id: 2, category: 'exam', title: '2학기 시험', startDate: '2026-11-25', endDate: '2026-11-27' }
+  ];
+  const mockNotes = [
+    { id: 1, category: 'activity', date: '2026-11-09', title: '농구 경기', detail: '체육관', userId: 0 },
+    { id: 2, category: 'makeup_plan', date: '2026-11-10', title: '보충 예정', detail: '', userId: 101 }
+  ];
+  function sampleSchool(date) {
+    const reasons = mockRules.filter(rule => {
+      let beginning = rule.startDate;
+      if (rule.category === 'exam') {
+        const start = new Date(rule.startDate + 'T12:00:00Z');
+        beginning = new Date(start.getTime() - 14 * 86400000).toISOString().slice(0, 10);
+      }
+      return beginning <= date && date <= rule.endDate;
+    }).map(rule => ({ category: rule.category, title: rule.title }));
+    return { all: reasons.length > 0, reasons };
+  }
+  function sampleMonth(month) {
+    const first = new Date(month + '-01T12:00:00Z');
+    const mondayOffset = (first.getUTCDay() + 6) % 7;
+    const begin = Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), 1 - mondayOffset);
+    const days = Array.from({ length: 42 }, (_, i) => {
+      const date = new Date(begin + i * 86400000).toISOString().slice(0, 10);
+      const weekday = (new Date(date + 'T12:00:00Z').getUTCDay() + 6) % 7 + 1;
+      return {
+        date, inMonth: date.slice(0, 7) === month, verified: true,
+        slots: [1, 3, 2].map(shift => ({ shift, members: roster.filter(m =>
+          m.type === 1 && m.day === weekday && m.shift === shift) })),
+        notes: mockNotes.filter(n => n.date === date).map(n => ({
+          ...n, name: roster.find(m => m.id === n.userId)?.name || ''
+        })),
+        records: date === today ? [{ id: 11, userId: 102, kind: 'duty', name: '예시 학생 B', shift: 1 }] : [],
+        school: sampleSchool(date), needsReview: false
+      };
+    });
+    return { ok: true, month, days };
+  }
   const server = {
     api_home: () => {
       const dutyMembers = scenario === 'crowded'
         ? roster.filter(m => m.type === 1 && m.day === 5 && m.shift === 1).concat(crowded)
         : scenario === 'single' ? roster.filter(m => m.id === 101)
         : scenario === 'empty' ? [] : roster.filter(m => m.type === 1 && m.day === 5 && m.shift === 1);
+      const mapped = m => ({ id: m.id, name: m.name, attended: attended.has(m.id) });
       return {
         today, current: scenario === 'closed' ? null : { day: 5, shift: 1 },
-        duty: dutyMembers.map(m => ({ id: m.id, name: m.name, attended: attended.has(m.id) })),
+        duty: dutyMembers.map(mapped),
+        slots: [1, 3, 2].map(shift => ({ shift, duty:
+          (shift === 1 ? dutyMembers : roster.filter(m =>
+            m.type === 1 && m.day === 5 && m.shift === shift)).map(mapped) })),
+        exemption: ['exam', 'holiday'].includes(scenario)
+          ? { all: true, reasons: [scenario === 'exam'
+            ? { category: 'exam', title: '2학기 시험' }
+            : { category: 'closed', title: '재량휴업일' }] }
+          : { all: false, reasons: [] },
         makeup: roster.filter(m => m.type === 1)
           .map(m => ({ id: m.id, name: m.name, grade: m.grade, onDuty: m.day === 5 && m.shift === 1 }))
       };
@@ -49,6 +97,25 @@ const mocks = String.raw`<script>
       records: [{ id: 11, userId: 102, shift: 1, kind: 'duty', detail: '' }],
       exempt: { all: false, grades: {} }
     }),
+    api_calendarMonth: month => sampleMonth(month),
+    api_schoolRules: () => mockRules.slice(),
+    api_schoolRuleSave: (data, replaceId) => {
+      if (replaceId) mockRules = mockRules.filter(r => r.id !== Number(replaceId));
+      mockRules.push({ ...data, id: Math.max(0, ...mockRules.map(r => r.id)) + 1 });
+      return { ok: true };
+    },
+    api_schoolRuleCancel: id => {
+      mockRules = mockRules.filter(r => r.id !== Number(id)); return { ok: true };
+    },
+    api_calendarAdd: data => {
+      mockNotes.push({ ...data, id: Math.max(0, ...mockNotes.map(r => r.id)) + 1 }); return { ok: true };
+    },
+    api_calendarDelete: id => {
+      const at = mockNotes.findIndex(n => n.id === Number(id));
+      if (at >= 0) mockNotes.splice(at, 1);
+      return { ok: true };
+    },
+    api_excuseAbsence: () => ({ ok: true, message: '가상 데이터: 면제 정정 예시' }),
     api_members: () => roster.slice(),
     api_rosterAudit: () => ({ ok: true, members: roster.length, events: roster.length + 3, errors: [] }),
     api_promotionPreview: () => ({ ok: true, year: 2027, done: false, reviewRequired: false,
@@ -114,6 +181,8 @@ const mocks = String.raw`<script>
     <option value="crowded">당번 8명</option>
     <option value="empty">배정된 당번 없음</option>
     <option value="closed">출석 시간 외</option>
+    <option value="exam">시험 준비 기간</option>
+    <option value="holiday">재량휴업일</option>
   </select>
   <small>가상 데이터 · 실제 서버 연결 없음</small>
 </div>`;
