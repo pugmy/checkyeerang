@@ -140,6 +140,11 @@ h2.sub { font-size: 1.1rem; font-weight: 700; }
 .search-empty {padding:1.5rem 1rem;border:1px dashed var(--line);border-radius:.5rem;color:var(--muted);text-align:center;margin-top:.75rem;}
 .search-empty[hidden] {display:none;}
 .member:focus-within {border-color:var(--brand);}
+.member-roster {display:grid;grid-template-columns:minmax(0,1fr);gap:.6rem;}
+@media(min-width:960px) {
+  .member-roster {grid-template-columns:repeat(2,minmax(0,1fr));}
+  .member-roster .member {align-content:start;}
+}
 /* 실제 키오스크의 키보드·터치 사용성 */
 body.modal-open {overflow:hidden;}
 .modal {overscroll-behavior:contain;}
@@ -884,7 +889,7 @@ async function renderMember() {
 
   const list = members.length === 0
     ? h('div', { class: 'card big' }, h('p', { class: 'bold' }, '등록된 부원이 없습니다.'), h('p', { class: 'muted', style: 'font-size:.9rem' }, '오른쪽 위 “부원 추가”로 시작해 보세요.'))
-    : h('ul', { class: 'col', style: 'gap:.5rem' }, members.map((m) =>
+    : h('ul', { class: 'member-roster' }, members.map((m) =>
         h('li', { class: 'card member' },
           nameBlock(m, DAYS[m.day - 1] + '요일 · ' + SHIFT[m.shift]),
           statsList(m),
