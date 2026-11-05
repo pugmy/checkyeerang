@@ -208,17 +208,22 @@ function recordAbsencesToday_() {
   }
 
   locked_(function () {
-    var users = read_('User').filter(function (u) { return u.type === 1; });
+    var users = read_('User');
+    var byId = {};
+    users.forEach(function (u) { byId[u.id] = u; });
+    var history = rosterIndex_();
     var records = read_('choolsuck').filter(function (r) { return r.date === date; });
     due.forEach(function (shift) {
       var deadline = new Date(range.start.getTime() + DEADLINE_MINUTE[shift] * 60 * 1000);
-      users
+      // 마감 시점의 시간표로 판단한다. 이후 수정된 배정으로 과거 결석을 만들지 않는다.
+      rosterHistoryFor_(users, history, rosterAtDeadline_(date, shift))
         .filter(function (u) {
           return (
+            u.type === 1 &&
             u.day === range.day &&
             u.shift === shift &&
             !isExempt_(exempt, u.grade) &&
-            u.createdAt < range.start.toISOString() && // 오늘 이전에 등록된 부원만
+            byId[u.id].createdAt < range.start.toISOString() && // 오늘 이전에 등록된 부원만
             !records.some(function (r) {
               return r.userId === u.id && r.shift === shift && (r.kind === 'duty' || r.kind === 'absent');
             })
