@@ -218,6 +218,21 @@ h2.sub {font-size:1.07rem;font-weight:700;}
 .stats dd {font-weight:730;}
 .choice {font-weight:650;}
 .detail {border-radius:.3rem;}
+/* 학년도 정리: 학생별 처리 결과를 눈으로 비교할 수 있는 행 */
+.modal.promotion-dialog {max-width:38rem;}
+.promotion-list {display:flex;flex-direction:column;gap:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+.promotion-row {display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.8rem .1rem;border-bottom:1px solid var(--line);}
+.promotion-row:last-child {border-bottom:0;}
+.promotion-person {display:flex;flex-direction:column;gap:.15rem;min-width:0;}
+.promotion-choice {flex:0 0 11rem;}
+.promotion-select {min-height:2.8rem;}
+.promotion-summary {font-weight:700;color:var(--ink);}
+.promotion-confirm {font-weight:600;cursor:pointer;}
+.promotion-confirm input {width:1.1rem;height:1.1rem;accent-color:var(--brand);}
+@media(max-width:460px) {
+  .promotion-choice {flex:0 0 8.3rem;}
+  .promotion-row {gap:.45rem;}
+}
 /* UI 2.1 — 학생 메인 화면은 중앙 집중, 관리자 화면은 넓은 작업 공간 */
 .home-page {max-width:52rem;margin-inline:auto;}
 .home-page .date-title {text-align:center;padding:1rem .25rem 1.75rem;}
@@ -733,52 +748,93 @@ async function inspectRoster() {
 }
 // 관리자가 명단을 확인한 뒤 진급을 실행한다. 학생 출석에는 영향이 없다.
 async function openPromotion() {
-  openModal({ label: '학년도 진급', narrow: false }, (box, close) => {
-    const content = h('div', { class: 'col' }, h('p', { class: 'muted' }, '진급 대상 명단을 불러오는 중입니다.'));
-    box.append(h('h2', {}, '학년도 진급'), content,
-      h('div', { class: 'actions' }, h('button', { class: 'btn ghost', type: 'button', onclick: close }, '닫기')));
+  openModal({ label: '학년도 명단 정리', narrow: false }, (box, close) => {
+    box.classList.add('promotion-dialog');
+    const content = h('div', { class: 'col' },
+      h('p', { class: 'muted', role: 'status' }, '명단을 불러오는 중입니다.'));
+    box.append(h('h2', {}, '학년도 명단 정리'), content,
+      h('div', { class: 'actions' },
+        h('button', { class: 'btn ghost', type: 'button', onclick: close }, '닫기')));
     adminApi('api_promotionPreview').then((preview) => {
       if (!preview.ok) {
         content.replaceChildren(h('p', { class: 'bad-text' }, preview.message));
         return;
       }
       if (preview.done) {
-        content.replaceChildren(h('p', {}, preview.year + '학년도 진급은 이미 처리되었습니다.'));
+        content.replaceChildren(h('p', {}, preview.year + '학년도 명단 정리를 마쳤습니다.'));
         return;
       }
       if (preview.reviewRequired) {
         content.replaceChildren(
-          h('p', { class: 'bad-text bold' }, '이전 진급 작업의 결과를 확인해야 합니다.'),
-          h('p', { class: 'muted' }, '중복 진급을 막기 위해 자동 재실행을 차단했습니다. 이력 점검과 원본 시트 확인 후 담당자가 처리해 주세요.'));
+          h('p', { class: 'bad-text bold' }, '이전 작업의 처리 결과를 먼저 확인해 주세요.'),
+          h('p', { class: 'muted' }, '중복 적용을 막기 위해 정리를 중단했습니다. 이력 점검 후 담당자가 원본 명단을 확인해야 합니다.'));
         return;
       }
-      const list = h('ul', { class: 'col' },
-        preview.members.map((m) => h('li', { class: 'detail' },
-          m.name + ' · ' + m.fromGrade + '학년 → ' +
-          (m.action === 'graduate' ? '졸업생' : m.toGrade + '학년'))));
-      const confirm = h('input', { type: 'checkbox', 'aria-label': '진급 대상 확인' });
-      const apply = h('button', { type: 'button', class: 'btn primary', disabled: true }, '진급 확정');
-      confirm.addEventListener('change', () => { apply.disabled = !confirm.checked; });
+
+      const options = [
+        ['promote', '진급'], ['graduate', '졸업'], ['exclude', '명단 제외'], ['keep', '현 상태 유지']
+      ];
+      const selected = new Map();
+      const summary = h('p', { class: 'promotion-summary', role: 'status', 'aria-live': 'polite' });
+      const confirm = h('input', { type: 'checkbox', 'aria-label': '명단 정리 내용 확인' });
+      const apply = h('button', { type: 'button', class: 'btn primary', disabled: true }, '변경 사항 적용');
+      const status = h('p', { role: 'alert', class: 'msg bad-text' });
+      const recalc = () => {
+        const counts = { promote: 0, graduate: 0, exclude: 0, keep: 0 };
+        selected.forEach((action) => { counts[action]++; });
+        summary.textContent =
+          '진급 ' + counts.promote + '명 · 졸업 ' + counts.graduate +
+          '명 · 명단 제외 ' + counts.exclude + '명 · 유지 ' + counts.keep + '명';
+        apply.disabled = !confirm.checked || !preview.members.length;
+      };
+
+      const list = h('ul', { class: 'promotion-list' },
+        preview.members.map((m) => {
+          const choose = h('select', {
+            class: 'field promotion-select', 'aria-label': m.name + ' 처리 방법'
+          }, options.filter(([action]) => action !== 'promote' || m.fromGrade < 3)
+            .map(([value, label]) => h('option', { value }, label)));
+          choose.value = m.action;
+          selected.set(m.id, m.action);
+          choose.addEventListener('change', () => {
+            selected.set(m.id, choose.value);
+            confirm.checked = false;
+            status.textContent = '';
+            recalc();
+          });
+          return h('li', { class: 'promotion-row' },
+            h('div', { class: 'promotion-person' },
+              h('span', { class: 'bold' }, m.name),
+              h('span', { class: 'name-sub' }, '현재 ' + m.fromGrade + '학년')),
+            h('label', { class: 'promotion-choice' },
+              h('span', { class: 'sr-only' }, m.name + ' 처리 방법'), choose));
+        }));
+
+      confirm.addEventListener('change', recalc);
       apply.onclick = async () => {
         const expected = preview.members.map(m => m.id + ':' + m.fromGrade);
+        const decisions = preview.members.map(m => ({ id: m.id, action: selected.get(m.id) }));
         let result;
-        try { result = await busy(apply, '처리 중...', () => adminApi('api_applyPromotion', preview.year, expected)); }
-        catch (e) { result = { ok: false, message: errText(e) }; }
+        try {
+          result = await busy(apply, '반영 중...', () =>
+            adminApi('api_applyPromotion', preview.year, expected, decisions));
+        } catch (e) { result = { ok: false, message: errText(e) }; }
         if (result.ok) { close(); show('member'); }
         else {
-          content.querySelector('[role="status"]').textContent = result.message;
-          apply.disabled = true;
+          status.textContent = result.message;
+          confirm.checked = false;
+          recalc();
         }
       };
+      recalc();
       content.replaceChildren(
-        h('p', {}, preview.year + '학년도 진급 대상: ' + preview.promotions + '명 진급, ' +
-          preview.graduates + '명 졸업'),
-        h('p', { class: 'muted' }, '신입생 등록과 조기졸업은 부원별로 따로 처리합니다. 아래 명단이 맞는지 확인해 주세요.'),
-        list,
-        h('label', { class: 'row wrap' }, confirm, '대상 명단과 학년을 확인했습니다.'),
-        h('p', { role: 'status', class: 'msg bad-text' }),
-        apply);
-      if (!preview.members.length) apply.disabled = true;
+        h('p', { class: 'muted' }, preview.year + '학년도 · 기존 재학생 ' + preview.members.length + '명'),
+        h('p', {}, '학생별 처리 방법을 확인하고, 필요한 항목만 바꿔 주세요.'),
+        h('p', { class: 'muted' },
+          '신입생은 ‘부원 추가’에서 등록하고, 기존 졸업생은 ‘졸업생’ 목록에서 관리할 수 있습니다.'),
+        list, summary,
+        h('label', { class: 'row wrap promotion-confirm' }, confirm, '위 내용을 확인했습니다.'),
+        status, apply);
     }).catch((e) => { content.replaceChildren(h('p', { class: 'bad-text' }, errText(e))); });
   });
 }
@@ -962,7 +1018,7 @@ async function renderMember() {
   return h('div', { class: 'stack' },
     h('div', { class: 'between', style: 'margin-bottom:1rem' }, h('h1', { class: 'title', style: 'margin:0' }, '부원 관리'), h('div', { class: 'row wrap' }, logoutControl(),
       h('button', { type: 'button', class: 'btn ghost sm', onclick: inspectRoster }, '이력 점검'),
-      h('button', { type: 'button', class: 'btn ghost sm', onclick: openPromotion }, '학년도 진급'),
+      h('button', { type: 'button', class: 'btn ghost sm', onclick: openPromotion }, '학년도 정리'),
       h('button', { type: 'button', class: 'btn primary', onclick: () => memberModal() }, '+ 부원 추가'))),
     overview,
     search,
