@@ -52,7 +52,10 @@ test("UI has labeled navigation, keyboard focus and reduced-motion handling", ()
   assert.match(html, /prefers-reduced-motion: reduce/);
   assert.match(html, /font-family: "SUIT Variable"/);
   assert.match(html, /<main id="main"><\/main>/);
-  assert.match(html, /<footer>개발 · 15기 김우준 · 16기 안준표<\/footer>/);
+  assert.match(html, /15기 김우준/);
+  assert.match(html, /github\.com\/WhoSia/);
+  assert.match(html, /16기 안준표/);
+  assert.match(html, /github\.com\/pugmy/);
 });
 
 test("preview supports several kiosk display conditions without real student data", () => {
@@ -104,4 +107,28 @@ test("annual roster review has per-student choices and plain-language exception 
   assert.match(client, /confirm\.checked = false/);
   assert.match(client, /adminApi\('api_applyPromotion', preview\.year, expected, decisions\)/);
   assert.match(html, /\.modal\.promotion-dialog \{max-width:38rem;/);
+});
+
+
+test("shift browsing is read-only outside the current time and has a return control", () => {
+  const html = fs.readFileSync(htmlPath, "utf8");
+  const client = html.match(/<script>([\s\S]*?)<\/script>\s*<\/body>/)?.[1] || "";
+  assert.match(client, /let homeViewedShift = null/);
+  assert.match(client, /'이전 시간대 보기'/);
+  assert.match(client, /'다음 시간대 보기'/);
+  assert.match(client, /'현재 당번으로'/);
+  assert.match(client, /const active = !exempt && actual === selected/);
+  assert.match(client, /active \? attendButton\(m\)/);
+  assert.match(client, /'다른 시간대의 담당자를 보고 있습니다/);
+  assert.match(html, /\.slot-return/);
+});
+
+test("monthly calendar and school rule editor are available only in the admin UI", () => {
+  const html = fs.readFileSync(htmlPath, "utf8");
+  const client = html.match(/<script>([\s\S]*?)<\/script>\s*<\/body>/)?.[1] || "";
+  assert.match(client, /calendar: \['달력', renderCalendar\]/);
+  assert.match(client, /adminApi\('api_calendarMonth', calendarMonth\)/);
+  assert.match(client, /adminApi\('api_schoolRuleSave', data, rule\?\.id \|\| 0\)/);
+  assert.match(client, /adminApi\('api_schoolRuleCancel', rule\.id\)/);
+  assert.match(client, /adminApi\('api_excuseAbsence', miss\.id\)/);
 });
