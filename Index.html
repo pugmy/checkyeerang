@@ -575,6 +575,52 @@ async function inspectRoster() {
     });
   });
 }
+// 관리자가 명단을 확인한 뒤 진급을 실행한다. 학생 출석에는 영향이 없다.
+async function openPromotion() {
+  openModal({ label: '학년도 진급', narrow: false }, (box, close) => {
+    const content = h('div', { class: 'col' }, h('p', { class: 'muted' }, '진급 대상 명단을 불러오는 중입니다.'));
+    box.append(h('h2', {}, '학년도 진급'), content,
+      h('div', { class: 'actions' }, h('button', { class: 'btn ghost', type: 'button', onclick: close }, '닫기')));
+    adminApi('api_promotionPreview').then((preview) => {
+      if (!preview.ok) {
+        content.replaceChildren(h('p', { class: 'bad-text' }, preview.message));
+        return;
+      }
+      if (preview.done) {
+        content.replaceChildren(h('p', {}, preview.year + '학년도 진급은 이미 처리되었습니다.'));
+        return;
+      }
+      const list = h('ul', { class: 'col' },
+        preview.members.map((m) => h('li', { class: 'detail' },
+          m.name + ' · ' + m.fromGrade + '학년 → ' +
+          (m.action === 'graduate' ? '졸업생' : m.toGrade + '학년'))));
+      const confirm = h('input', { type: 'checkbox', 'aria-label': '진급 대상 확인' });
+      const apply = h('button', { type: 'button', class: 'btn primary', disabled: true }, '진급 확정');
+      confirm.addEventListener('change', () => { apply.disabled = !confirm.checked; });
+      apply.onclick = async () => {
+        const expected = preview.members.map(m => m.id + ':' + m.fromGrade);
+        let result;
+        try { result = await busy(apply, '처리 중...', () => adminApi('api_applyPromotion', preview.year, expected)); }
+        catch (e) { result = { ok: false, message: errText(e) }; }
+        if (result.ok) { close(); show('member'); }
+        else {
+          content.querySelector('[role="status"]').textContent = result.message;
+          apply.disabled = true;
+        }
+      };
+      content.replaceChildren(
+        h('p', {}, preview.year + '학년도 진급 대상: ' + preview.promotions + '명 진급, ' +
+          preview.graduates + '명 졸업'),
+        h('p', { class: 'muted' }, '신입생 등록과 조기졸업은 부원별로 따로 처리합니다. 아래 명단이 맞는지 확인해 주세요.'),
+        list,
+        h('label', { class: 'row wrap' }, confirm, '대상 명단과 학년을 확인했습니다.'),
+        h('p', { role: 'status', class: 'msg bad-text' }),
+        apply);
+      if (!preview.members.length) apply.disabled = true;
+    }).catch((e) => { content.replaceChildren(h('p', { class: 'bad-text' }, errText(e))); });
+  });
+}
+
 // ---------- 부원관리 ----------
 function memberModal(member) {
   openModal({ label: member ? '부원 수정' : '부원 추가' }, (box, close) => {
@@ -693,6 +739,7 @@ async function renderMember() {
   return h('div', { class: 'stack' },
     h('div', { class: 'between', style: 'margin-bottom:1rem' }, h('h1', { class: 'title', style: 'margin:0' }, '부원 관리'), h('div', { class: 'row wrap' }, logoutControl(),
       h('button', { type: 'button', class: 'btn ghost sm', onclick: inspectRoster }, '이력 점검'),
+      h('button', { type: 'button', class: 'btn ghost sm', onclick: openPromotion }, '학년도 진급'),
       h('button', { type: 'button', class: 'btn primary', onclick: () => memberModal() }, '+ 부원 추가'))),
     list,
     graduates);
