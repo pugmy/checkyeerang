@@ -94,7 +94,10 @@ function api_excuseAbsence(absenceId, token) {
     var member = users.filter(function (u) { return u.id === record.userId; })[0];
     if (!member) return result_(false, '부원 정보를 찾을 수 없습니다.');
     var ex = schoolExemption_(record.date);
-    if (!isExempt_(ex, member.grade)) {
+    var historical = rosterStateAt_(rosterIndex_(), member.id,
+      record.shift ? rosterAtDeadline_(record.date, record.shift) :
+        new Date(parseDate_(record.date).end.getTime() - 1).toISOString()) || member;
+    if (!isExempt_(ex, historical.grade)) {
       return result_(false, '해당 날짜에는 면제 규칙이 없습니다. 먼저 달력에서 등교·시험 일정을 확인해 주세요.');
     }
     if (member.runCount < 1) {
