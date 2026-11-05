@@ -192,3 +192,19 @@ test("yearly promotion failure restores the previous cohort", () => {
   ), /되돌렸습니다/);
   assert.deepEqual(written, [[3], [2]]);
 });
+
+test("partial bulk update failure also triggers promotion compensation", () => {
+  const h = harness([student]);
+  let calls = 0, restored = null;
+  h.context.writeAll_ = (_table, members) => {
+    calls++;
+    if (calls === 1) throw new Error("partial sheet write");
+    restored = members.map(member => member.grade);
+  };
+  h.context.rosterWriteEvents_ = () => { throw new Error("should not reach event write"); };
+  assert.throws(() => h.context.rosterPromoteOrRollback_(
+    [student], [{ ...student, grade: 3 }], [{ userId: 7, patch: { grade: 3 } }], new Date().toISOString()
+  ), /되돌렸습니다/);
+  assert.deepEqual(restored, [2]);
+  assert.equal(calls, 2);
+});
