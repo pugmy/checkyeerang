@@ -101,3 +101,16 @@ test("deny all administrative reads and writes without authorization", () => {
   assert.throws(() => context.api_deleteMember(1), /관리자/);
   assert.equal(rows.User.length, 1);
 });
+
+test("refuse member mutation when roster audit fails", () => {
+  const { context, rows } = harness({ User: [member] });
+  context.rosterAssertConsistent_ = () => {
+    throw new Error("시간표 이력과 현재 부원 정보가 일치하지 않습니다.");
+  };
+  assert.throws(() => context.api_updateMember(1,
+    { name: "변경", grade: 2, day: 2, shift: 1 }, "test-admin-token"), /시간표 이력/);
+  assert.equal(rows.User[0].name, member.name);
+  assert.equal(rows.User[0].day, member.day);
+  assert.throws(() => context.api_deleteMember(1, "test-admin-token"), /시간표 이력/);
+  assert.equal(rows.User[0].type, undefined);
+});
