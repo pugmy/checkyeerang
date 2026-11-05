@@ -134,6 +134,9 @@ h2.sub { font-size: 1.1rem; font-weight: 700; }
 @keyframes pulse-soft { 50% { opacity: .5; } }
 @keyframes check-pop { 0% { transform: scale(.6); opacity: 0; } 70% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
+.search-empty {padding:1.5rem 1rem;border:1px dashed var(--line);border-radius:.5rem;color:var(--muted);text-align:center;margin-top:.75rem;}
+.search-empty[hidden] {display:none;}
+.member:focus-within {border-color:var(--brand);}
 /* 실제 키오스크의 키보드·터치 사용성 */
 body.modal-open {overflow:hidden;}
 .modal {overscroll-behavior:contain;}
@@ -866,7 +869,9 @@ async function renderMember() {
 
   const search = h('input', { type: 'search', class: 'field',
     placeholder: '부원 이름 검색', 'aria-label': '부원 이름 검색' });
-  const searchCount = h('p', { class: 'muted', role: 'status', style: 'font-size:.875rem' });
+  const searchCount = h('p', { class: 'muted', role: 'status', 'aria-live': 'polite', style: 'font-size:.875rem' });
+  const emptySearch = h('p', { class: 'search-empty', role: 'status' }, '검색 결과가 없습니다. 이름을 다시 확인해 주세요.');
+  emptySearch.hidden = true;
   const overview = h('p', { class: 'muted', style: 'margin:.5rem 0 1rem' },
     '재학생 ' + members.length + '명 · ' +
     [1, 2, 3].map(g => g + '학년 ' + members.filter(m => m.grade === g).length + '명').join(' · '));
@@ -912,12 +917,14 @@ async function renderMember() {
   search.addEventListener('input', () => {
     const query = search.value.trim().toLocaleLowerCase('ko-KR');
     let visible = 0;
-    Array.from(list.querySelectorAll('li')).forEach((item, i) => {
-      const matches = members[i].name.toLocaleLowerCase('ko-KR').includes(query);
+    Array.from(list.children).forEach((item, i) => {
+      const member = members[i];
+      const matches = !!member && member.name.toLocaleLowerCase('ko-KR').includes(query);
       item.style.display = matches ? '' : 'none';
       if (matches) visible++;
     });
     searchCount.textContent = query ? '검색 결과 ' + visible + '명' : '';
+    emptySearch.hidden = !query || visible !== 0 || !members.length;
   });
 
   return h('div', { class: 'stack' },
@@ -929,6 +936,7 @@ async function renderMember() {
     search,
     searchCount,
     list,
+    emptySearch,
     graduates,
     archivedList);
 }
