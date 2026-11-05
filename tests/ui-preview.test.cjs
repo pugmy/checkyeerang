@@ -53,3 +53,23 @@ test("UI has labeled navigation, keyboard focus and reduced-motion handling", ()
   assert.match(html, /<main id="main"><\/main>/);
   assert.match(html, /<footer>개발 · 15기 김우준 · 16기 안준표<\/footer>/);
 });
+
+test("preview supports several kiosk display conditions without real student data", () => {
+  const builder = fs.readFileSync(builderPath, "utf8");
+  assert.match(builder, /value="regular"/);
+  assert.match(builder, /value="crowded"/);
+  assert.match(builder, /value="empty"/);
+  assert.match(builder, /value="closed"/);
+  assert.match(builder, /scenario === 'closed' \? null/);
+  assert.match(builder, /window\.google = \{ script:/);
+  assert.doesNotMatch(builder, /https:\/\/script\.google\.com/);
+});
+
+test("viewport, Korean document title and authoritative day are provided", () => {
+  const html = fs.readFileSync(htmlPath, "utf8");
+  assert.match(html, /name="viewport" content="width=device-width, initial-scale=1"/);
+  assert.match(html, /<title>창원과학고 도서관 출석<\/title>/);
+  assert.match(html, /new Date\(d\.today \+ 'T12:00:00\+09:00'\)/);
+  assert.match(html, /class: 'member-roster'/);
+  assert.match(html, /\.member-roster/);
+});
