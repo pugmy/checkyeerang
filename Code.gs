@@ -383,7 +383,7 @@ function api_addMember(d, token) {
       { name: String(d.name).trim(), grade: Number(d.grade), day: Number(d.day), shift: Number(d.shift), workCount: 0, addCount: 0, runCount: 0, type: 1 },
       ['name', 'type']
     );
-    if (row) rosterLog_(row.id, null, row);
+    if (row) rosterSaveEventOrRollback_(null, row);
     return row ? result_(true, '추가되었습니다.') : result_(false, '이미 같은 이름의 부원이 있습니다.');
   });
 }
@@ -405,7 +405,7 @@ function api_updateMember(id, d, token) {
     );
     if (r === 'DUP') return result_(false, '이미 같은 이름의 부원이 있습니다.');
     if (r === 'NOTFOUND') return result_(false, '존재하지 않는 부원입니다.');
-    rosterLog_(r.id, before, r);
+    rosterSaveEventOrRollback_(before, r);
     return result_(true, '수정되었습니다.');
   });
 }
@@ -419,7 +419,7 @@ function api_graduate(id, token) {
     var before = read_('User').filter(function (u) { return u.id === Number(id); })[0];
     var r = update_('User', Number(id), { type: 0 });
     if (r === 'NOTFOUND') return result_(false, '존재하지 않는 부원입니다.');
-    rosterLog_(r.id, before, r);
+    rosterSaveEventOrRollback_(before, r);
     return result_(true, '졸업 처리되었습니다.');
   });
 }
@@ -433,7 +433,7 @@ function api_restore(id, token) {
     var r = update_('User', Number(id), { type: 1 }, null, ['name', 'type']);
     if (r === 'DUP') return result_(false, '같은 이름의 재학생이 있어 복귀할 수 없습니다.');
     if (r === 'NOTFOUND') return result_(false, '존재하지 않는 부원입니다.');
-    rosterLog_(r.id, before, r);
+    rosterSaveEventOrRollback_(before, r);
     return result_(true, '재학생으로 복귀했습니다.');
   });
 }
@@ -470,8 +470,7 @@ function promoteYearly_() {
     var changes = users.map(function (u, i) {
       return { userId: u.id, patch: rosterPatch_(previous[i], u) };
     }).filter(function (item) { return Object.keys(item.patch).length > 0; });
-    writeAll_('User', users);
-    rosterWriteEvents_(changes, stamp);
+    rosterPromoteOrRollback_(previous, users, changes, stamp);
     props.setProperty('PROMOTED_YEAR', String(year));
   });
 }
@@ -493,7 +492,7 @@ function api_deleteMember(id, token) {
     }
     var updated = update_('User', id, { type: -1 });
     if (updated === 'NOTFOUND') return result_(false, '존재하지 않는 부원입니다.');
-    rosterLog_(id, member, updated);
+    rosterSaveEventOrRollback_(member, updated);
     return result_(true, '부원 목록에서 제외되었습니다.');
   });
 }
