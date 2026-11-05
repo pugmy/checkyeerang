@@ -18,7 +18,7 @@ Development branch: `15th-Gen-Kim-Woojun`.
 3. **High – CSV semantics:** `api_csv` filters by `createdAt`, not attendance `date`; this can omit records written later and include records for different days. Filter by `date` and explicitly include only duty/makeup records.
 4. **High – Historical roster:** Historical attendance views rely on the current roster and schedule. Schedule snapshots or effective dates are needed for correct historical views.
 5. **Medium – NEIS reliability:** A temporary NEIS failure skips absent-record generation without an independent backfill window.
-6. **Medium – Makeup approvals:** `api_makeup` instantly increments `addCount`; no authorized approval workflow exists.
+6. **Operational boundary – Student kiosk:** Ordinary attendance and makeup remain direct submissions on the designated library PC. Student login and makeup approval are intentionally out of scope.
 
 ## Development status (not deployed)
 
@@ -32,12 +32,27 @@ Development branch: `15th-Gen-Kim-Woojun`.
 
 ### Residual risks
 
-- A public student can still submit another student's ordinary or makeup attendance. A verified identity or administrator approval workflow is not yet implemented.
+- Student attendance and makeup intentionally do not require individual login or approval; the intended operating environment is a supervised library kiosk. Note: an Apps Script deployment configured for anonymous access is not technically restricted to that PC, even when the kiosk is the intended place of use.
 - Admin credentials use a random high-entropy password and salted SHA-256 hash; a predictable or reused password would not meet the design assumption.
 - Failed login counters live in a shared, best-effort Apps Script cache. This is not a robust distributed anti-abuse service and can temporarily lock out the administrator.
 - Session cache eviction can end an administrator session before four hours.
-- Historic roster, grade and shift values are not fully snapshotted. Past reports may change when the current roster is edited.
+- `RosterHistory.gs` adds an initial baseline and timestamped field deltas. Pre-baseline roster data cannot be recovered reliably, and Google Sheets multi-sheet writes are not transactional.
 - Google Apps Script deployments are versioned separately from GitHub: pushing a branch does not update the deployed web app.
+
+## Temporal model implementation
+
+- `RosterHistory` stores one initial state per existing member, then only changed fields with UTC effective timestamps. More information: [Temporal Roster](TEMPORAL_ROSTER.md).
+- Member updates, add, graduation, restoration and annual promotion append events. Removing an attendance-free member is a logical removal (`type=-1`), preserving historical assignments.
+- Historical views reconstruct each shift at the applicable deadline; CSV recovers name, grade and assignment from the corresponding point in time. Pre-migration rows are marked unverified.
+- Automatic absence checks now inspect the roster as it existed at each shift deadline.
+- Admin sessions lock after 15 minutes of inactivity on administrator pages; student use on the home page does not extend a session.
+
+## Deferred validation
+
+- Run Node tests under the user's actual local Node.js installation and verify independent Apps Script deployment.
+- Exercise setup migration and legacy trigger cleanup with a copy of a populated sheet.
+- Introduce reconciliation/repair for the small failure window between updating the materialized `User` row and appending its history event.
+- Validate behavior at year boundaries and mid-day roster changes.
 
 ## Proposed validation
 
