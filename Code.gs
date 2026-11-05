@@ -557,7 +557,7 @@ function api_applyPromotion(year, expectedIds, decisions, token) {
     rosterPromoteOrRollback_(previous, users, changes, stamp);
     props.setProperty('PROMOTED_YEAR', String(year));
     props.deleteProperty('PROMOTION_PENDING_YEAR');
-    return result_(true, year + '학년도 진급 처리가 완료되었습니다.');
+    return result_(true, year + '학년도 명단 정리가 완료되었습니다.');
   });
 }
 
