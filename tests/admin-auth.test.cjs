@@ -76,7 +76,8 @@ test("maintenance entrypoints are private to Apps Script", () => {
 
 test("all administrative server endpoints call authorization first", () => {
   for (const name of ["api_admin", "api_members", "api_addMember", "api_updateMember",
-    "api_deleteMember", "api_graduate", "api_restore", "api_csv"]) {
+    "api_deleteMember", "api_graduate", "api_restore", "api_csv",
+    "api_promotionPreview", "api_applyPromotion", "api_rosterAudit"]) {
     assert.match(code, new RegExp("function\\s+" + name +
       "\\s*\\([^)]*\\)\\s*\\{\\s*requireAdmin_\\(token\\)"));
   }
