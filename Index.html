@@ -753,7 +753,7 @@ async function renderMember() {
           h('div', { class: 'row' },
             h('button', { type: 'button', class: 'btn ghost sm', onclick: () => memberModal(m) }, '수정'),
             h('button', { type: 'button', class: 'btn ghost sm', onclick: () => graduateModal(m) }, '졸업'),
-            h('button', { type: 'button', class: 'btn danger sm', onclick: () => deleteModal(m) }, '삭제')))));
+            h('button', { type: 'button', class: 'btn danger sm', onclick: () => deleteModal(m) }, '명단 제외')))));
 
   const restore = async (btn, m) => {
     let r;
@@ -769,7 +769,7 @@ async function renderMember() {
       return h('li', { class: 'card member' },
         nameBlock(m, '졸업'),
         statsList(m),
-        h('div', { class: 'row' }, back, h('button', { type: 'button', class: 'btn danger sm', onclick: () => deleteModal(m) }, '삭제')));
+        h('div', { class: 'row' }, back, h('button', { type: 'button', class: 'btn danger sm', onclick: () => deleteModal(m) }, '명단 제외')));
     })));
 
   const archivedList = archived.length > 0 && h('details', { class: 'mt8' },
