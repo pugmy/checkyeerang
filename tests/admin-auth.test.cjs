@@ -71,8 +71,7 @@ test("too many failed login attempts are rejected", () => {
 test("maintenance entrypoints are private to Apps Script", () => {
   for (const name of ["setup", "findSchool", "recordAbsencesToday"]) {
     assert.doesNotMatch(code, new RegExp("function\\s+" + name + "\\s*\\("));
-    const moduleSource = name === "api_rosterAudit" ? audit : code;
-    assert.match(moduleSource, new RegExp("function\\s+" + name + "_\\s*\\("));
+    assert.match(code, new RegExp("function\\s+" + name + "_\\s*\\("));
   }
   // Manual promotion deliberately replaces the previous automatic entrypoint.
   assert.doesNotMatch(code, /function\s+promoteYearly_?\s*\(/);
@@ -84,7 +83,8 @@ test("all administrative server endpoints call authorization first", () => {
   for (const name of ["api_admin", "api_members", "api_addMember", "api_updateMember",
     "api_deleteMember", "api_graduate", "api_restore", "api_csv",
     "api_promotionPreview", "api_applyPromotion", "api_rosterAudit"]) {
-    assert.match(code, new RegExp("function\\s+" + name +
+    const moduleSource = name === "api_rosterAudit" ? audit : code;
+    assert.match(moduleSource, new RegExp("function\\s+" + name +
       "\\s*\\([^)]*\\)\\s*\\{\\s*requireAdmin_\\(token\\)"));
   }
 });
