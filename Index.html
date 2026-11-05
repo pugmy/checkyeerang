@@ -499,6 +499,7 @@ function makeupSection(d) {
 
   return h('section', { class: 'makeup', 'aria-labelledby': 'makeup-title' },
     h('h2', { class: 'sub', id: 'makeup-title' }, '보충 출석'),
+    h('p', { class: 'muted' }, '정규 당번이 아닌 날의 도서관 활동을 기록합니다.'),
     h('div', { class: 'label' }, '부원', pick),
     h('label', { class: 'label' }, '특이사항', detail),
     msg, submit);
@@ -513,8 +514,8 @@ async function renderHome() {
     duty = h('section', { class: 'card big mt4' }, h('p', { class: 'bold', style: 'font-size:1.25rem' }, '지금은 당번 출석 시간이 아닙니다.'));
   } else {
     duty = h('section', { class: 'mt4', 'aria-labelledby': 'duty-title' },
-      h('div', { class: 'between', style: 'padding:0 .25rem .75rem' },
-        h('h2', { class: 'sub', id: 'duty-title' }, '지금 ' + SHIFT[d.current.shift] + ' 당번'),
+      h('div', { class: 'between slot-heading' },
+        h('h2', { class: 'sub', id: 'duty-title' }, SHIFT[d.current.shift] + ' 당번 출석'),
         h('span', { class: 'pill info' }, TIME[d.current.shift])),
       d.duty.length
         ? h('ul', { class: 'grid2' }, d.duty.map((m) =>
@@ -525,9 +526,11 @@ async function renderHome() {
   return h('div', { class: 'stack' },
     h('h1', { class: 'sr-only' }, '출석체크'),
     h('div', { class: 'date-title' },
+      h('p', { class: 'app-eyebrow' }, 'LIBRARY ATTENDANCE'),
       h('p', { class: 'y' }, fmt({ year: 'numeric' })),
       h('p', { class: 'md' }, fmt({ month: 'long', day: 'numeric' }), h('span', {}, fmt({ weekday: 'long' })))),
     duty,
+    d.current && h('p', { class: 'home-note' }, '본인의 이름을 선택해 출석을 기록해 주세요.'),
     makeupSection(d));
 }
 
