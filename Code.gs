@@ -187,7 +187,6 @@ function result_(ok, message) {
 // 오늘 마감이 지난 당번 중 출석하지 않은 부원을 결석(absent)으로 기록하고 runCount를 1 올린다.
 // 같은 (부원, 날짜, 당번, 종류)는 insert_의 unique 검사로 한 번만 들어가므로 여러 번 불러도 된다.
 function recordAbsencesToday_() {
-  promoteYearly_();
   var now = new Date();
   var date = today_(now);
   var range = parseDate_(date);
@@ -451,27 +450,71 @@ function promote_(users, cutoffISO, nowISO) {
   return changed;
 }
 
-// 3월(1~31일)에 올해 진급을 아직 안 했으면 한 번만 실행한다. 5분 트리거와 화면 접속 때 확인한다.
-function promoteYearly_() {
-  var date = today_();
-  var year = Number(date.slice(0, 4));
-  if (date < year + '-03-01' || date > year + '-03-31') return;
-  var props = PropertiesService.getScriptProperties();
-  var done = function () { return Number(props.getProperty('PROMOTED_YEAR')) >= year; };
-  if (done()) return;
-  locked_(function () {
-    if (done()) return; // 락을 기다리는 사이 다른 실행이 끝냈을 수 있다
+// 진급은 관리자 확인 후에만 실행한다. 출석/결석 트리거는 학년을 바꾸지 않는다.
+function promotionPlan_(users, year) {
+  var cutoff = parseDate_(year + '-03-01').start.toISOString();
+  return users.filter(function (u) {
+    return u.type === 1 && u.createdAt < cutoff;
+  }).map(function (u) {
+    return { id: u.id, name: u.name, fromGrade: u.grade,
+      toGrade: u.grade >= 3 ? null : u.grade + 1,
+      action: u.grade >= 3 ? 'graduate' : 'promote' };
+  });
+}
+
+function promotionYear_() {
+  var today = today_();
+  var year = Number(today.slice(0, 4));
+  // 새 학년도 시작 전에는 실행 불가; 이후에는 학기 중 늦게라도 직접 처리 가능.
+  return today >= year + '-03-01' ? year : null;
+}
+
+function api_promotionPreview(token) {
+  requireAdmin_(token);
+  var year = promotionYear_();
+  if (!year) return { ok: false, message: '3월 1일부터 새 학년도 진급을 처리할 수 있습니다.' };
+  var done = Number(PropertiesService.getScriptProperties().getProperty('PROMOTED_YEAR')) >= year;
+  var plan = done ? [] : promotionPlan_(read_('User'), year);
+  return { ok: true, year: year, done: done, members: plan,
+    promotions: plan.filter(function (u) { return u.action === 'promote'; }).length,
+    graduates: plan.filter(function (u) { return u.action === 'graduate'; }).length };
+}
+
+function api_applyPromotion(year, expectedIds, token) {
+  requireAdmin_(token);
+  year = Number(year);
+  if (!Number.isSafeInteger(year) || promotionYear_() !== year) {
+    return result_(false, '진급 대상 학년도를 다시 확인하세요.');
+  }
+  if (!Array.isArray(expectedIds) || expectedIds.length > 500 ||
+      expectedIds.some(function (id) { return !Number.isSafeInteger(id) || id <= 0; })) {
+    return result_(false, '진급 대상 명단이 올바르지 않습니다.');
+  }
+  return locked_(function () {
+    var props = PropertiesService.getScriptProperties();
+    if (Number(props.getProperty('PROMOTED_YEAR')) >= year) {
+      return result_(false, '이번 학년도 진급은 이미 처리되었습니다.');
+    }
     rosterRequireBaseline_();
     rosterAssertConsistent_();
     var users = read_('User');
+    var plan = promotionPlan_(users, year);
+    var actual = plan.map(function (x) { return x.id; }).sort(function (a,b) {return a-b;});
+    var expected = expectedIds.slice().sort(function (a,b) {return a-b;});
+    if (actual.length !== expected.length ||
+        actual.some(function (id,i) {return id !== expected[i];})) {
+      return result_(false, '진급 대상 명단이 변경되었습니다. 미리보기를 다시 확인하세요.');
+    }
+    if (!plan.length) return result_(false, '진급할 재학생이 없습니다.');
     var previous = users.map(function (u) { return Object.assign({}, u); });
     var stamp = new Date().toISOString();
     promote_(users, parseDate_(year + '-03-01').start.toISOString(), stamp);
-    var changes = users.map(function (u, i) {
+    var changes = users.map(function (u,i) {
       return { userId: u.id, patch: rosterPatch_(previous[i], u) };
-    }).filter(function (item) { return Object.keys(item.patch).length > 0; });
+    }).filter(function (x) { return Object.keys(x.patch).length > 0; });
     rosterPromoteOrRollback_(previous, users, changes, stamp);
     props.setProperty('PROMOTED_YEAR', String(year));
+    return result_(true, year + '학년도 진급 처리가 완료되었습니다.');
   });
 }
 
