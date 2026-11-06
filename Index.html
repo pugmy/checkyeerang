@@ -3,8 +3,12 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f7f8f6">
+<title>창원과학고 도서관 출석</title>
+<!-- SUIT Variable: UI용 한글 서체, SIL Open Font License 1.1 -->
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link href="https://cdn.jsdelivr.net/gh/sun-typeface/SUIT@2/fonts/variable/woff2/SUIT-Variable.css" rel="stylesheet">
 <style>
 :root {
   --bg: #f3f6f2; --surface: #fff; --ink: #16212b; --muted: #566573; --line: #dce3df;
@@ -26,7 +30,7 @@
 body {
   margin: 0; padding: 0 1rem; min-height: 100vh; display: flex; flex-direction: column; align-items: center;
   background: var(--bg); color: var(--ink); line-height: 1.6; word-break: keep-all;
-  font-family: "Noto Sans KR", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  font-family: "SUIT Variable", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%;
 }
 :focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
@@ -133,6 +137,208 @@ h2.sub { font-size: 1.1rem; font-weight: 700; }
 @keyframes pulse-soft { 50% { opacity: .5; } }
 @keyframes check-pop { 0% { transform: scale(.6); opacity: 0; } 70% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
+.search-empty {padding:1.5rem 1rem;border:1px dashed var(--line);border-radius:.5rem;color:var(--muted);text-align:center;margin-top:.75rem;}
+.search-empty[hidden] {display:none;}
+.member:focus-within {border-color:var(--brand);}
+.member-roster {display:grid;grid-template-columns:minmax(0,1fr);gap:.6rem;}
+@media(min-width:960px) {
+  .member-roster {grid-template-columns:repeat(2,minmax(0,1fr));}
+  .member-roster .member {align-content:start;}
+}
+/* 실제 키오스크의 키보드·터치 사용성 */
+body.modal-open {overflow:hidden;}
+.modal {overscroll-behavior:contain;}
+button, .choice, summary {touch-action:manipulation;}
+@media(max-width:680px) {
+  input, textarea, select {font-size:16px;}
+  .btn.sm {min-height:44px;}
+  .modal {max-height:calc(100dvh - 1rem);}
+}
+/* Checkyeerang UI 2.0 — 조용하고 명확한 도서관용 인터페이스.
+   기존 DOM/JS의 기능을 유지하며 시각 체계만 조정한다. */
+:root {
+  --bg:#f7f8f6; --surface:#fff; --ink:#20302e; --muted:#566966; --line:#dce4df;
+  --brand:#286e68; --brand-hover:#205c57; --brand-soft:#e8f2ef; --on-brand:#fff;
+  --leaf:#84ae82; --ok:#176344; --ok-soft:#e8f5ec;
+  --bad:#a63346; --bad-soft:#fbeced; --idle-soft:#f0f3f0;
+  --shadow:0 1px 3px rgb(25 52 46 / .035);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:#111b1a; --surface:#1b2927; --ink:#e9f1ed; --muted:#b1c5be;
+    --line:#334641; --brand:#91d3c2; --brand-hover:#b4e4d8;
+    --brand-soft:#25433b; --on-brand:#102521; --leaf:#9cbe99;
+    --ok:#a8e0c2; --ok-soft:#1b3a2b; --bad:#ffacb7;
+    --bad-soft:#40272c; --idle-soft:#253430; --shadow:none;
+  }
+}
+body {line-height:1.53;letter-spacing:-.012em;}
+header {
+  width:min(100%,65rem);flex-direction:row;justify-content:space-between;
+  flex-wrap:wrap;gap:1rem;padding:1.25rem 0 1.75rem;
+  border-bottom:1px solid var(--line);margin-bottom:2.15rem;
+}
+.logo {padding:0;border-radius:0;background:transparent;box-shadow:none;}
+.logo img {width:13.75rem;max-height:3.5rem;object-fit:contain;object-position:left center;}
+nav {max-width:none;width:auto;min-width:min(100%,23rem);gap:.2rem;padding:.2rem;
+  border-color:var(--line);border-radius:.6rem;box-shadow:none;}
+nav button {padding:0 .95rem;border-radius:.4rem;min-height:2.55rem;font-size:.9rem;font-weight:600;}
+nav button[aria-current="page"] {background:var(--ink);color:var(--surface);}
+nav button:hover:not([aria-current="page"]) {background:var(--idle-soft);color:var(--ink);}
+main {max-width:65rem;padding-bottom:3rem;}
+footer {font-size:.8rem;margin:1.5rem 0 2rem;}
+.card {border-radius:.7rem;box-shadow:none;padding:1.25rem;}
+.card.big {padding:2.5rem;}
+.btn {border-radius:.5rem;min-height:2.85rem;font-weight:650;}
+.btn:active:not(:disabled),.choice:active {transform:none;}
+.btn.lg {min-height:3.65rem;border-radius:.5rem;font-weight:700;font-size:1.08rem;}
+.btn.sm {border-radius:.4rem;}
+.field,.choice {border-radius:.5rem;}
+.field:focus-visible,.choice:focus-visible {outline:3px solid var(--brand);outline-offset:2px;box-shadow:none;}
+h1.title {font-size:1.75rem;font-weight:750;letter-spacing:-.04em;}
+h2.sec {font-size:1.3rem;font-weight:730;}
+h2.sub {font-size:1.07rem;font-weight:700;}
+.date-title {text-align:left;padding:.4rem .1rem 1.6rem;border-bottom:1px solid var(--line);}
+.date-title .y {font-size:.79rem;font-weight:700;letter-spacing:.11em;}
+.date-title .md {font-size:clamp(1.8rem,4vw,2.7rem);font-weight:740;letter-spacing:-.055em;line-height:1.3;}
+.date-title .md span {font-weight:500;margin-left:1rem;font-size:.65em;color:var(--muted);}
+.grid2 {gap:.9rem;}
+@media(min-width:720px) {.grid2 {grid-template-columns:repeat(3,minmax(0,1fr));}}
+.duty-card {min-height:13.5rem;gap:1.4rem;justify-content:space-between;padding:1.6rem 1.4rem;}
+.duty-name {font-size:clamp(1.8rem,3vw,2.4rem);font-weight:720;letter-spacing:-.055em;text-align:center;}
+.pill {border-radius:.4rem;font-weight:650;}
+.pill.big {border-radius:.45rem;}
+.makeup {max-width:43rem;margin-top:3.5rem;border-top:1px solid var(--line);padding-top:1.65rem;}
+.makeup .field {max-width:100%;}
+.modal {border-radius:1rem 1rem 0 0;box-shadow:0 16px 48px rgb(0 0 0 / .18);}
+@media(min-width:640px) {.modal {border-radius:.85rem;}}
+.member {box-shadow:none;padding:.9rem 1.15rem;}
+.member .info {flex-basis:13rem;}
+.stats {gap:1.6rem;}
+.stats dd {font-weight:730;}
+.choice {font-weight:650;}
+.detail {border-radius:.3rem;}
+/* 관리자 주간 시간표 — 행은 시간대, 열은 요일. 버튼을 통해 직접 수정 */
+.schedule-section {margin:1.25rem 0 1.8rem;}
+.schedule-heading {margin-bottom:.85rem;}
+.schedule-heading h2 {margin:0 0 .3rem;}
+.schedule-scroll {overflow-x:auto;max-width:100%;border:1px solid var(--line);
+  border-radius:.65rem;background:var(--surface);overscroll-behavior-x:contain;}
+.schedule-scroll:focus-visible {outline:3px solid var(--brand);outline-offset:2px;}
+.schedule-table {border-collapse:collapse;table-layout:fixed;width:100%;min-width:650px;}
+.schedule-table th,.schedule-table td {border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:.65rem;vertical-align:top;}
+.schedule-table tr:last-child > * {border-bottom:none;}
+.schedule-table tr > *:last-child {border-right:none;}
+.schedule-table thead th {text-align:center;font-size:.92rem;background:var(--idle-soft);font-weight:700;}
+.schedule-table tbody th {width:8.5rem;font-weight:700;text-align:left;background:var(--idle-soft);}
+.schedule-time {display:block;font-weight:400;color:var(--muted);font-size:.72rem;margin-top:.25rem;white-space:nowrap;}
+.schedule-cell {width:calc((100% - 8.5rem)/5);text-align:center;min-height:4rem;}
+.schedule-person {display:flex;flex-direction:column;align-items:center;gap:.15rem;
+  width:100%;min-height:2.75rem;padding:.45rem .3rem;margin-bottom:.35rem;border:1px solid var(--line);
+  border-radius:.4rem;color:var(--ink);background:var(--surface);font:inherit;font-weight:650;cursor:pointer;}
+.schedule-person:last-child {margin-bottom:0;}
+.schedule-person:hover {border-color:var(--brand);background:var(--brand-soft);}
+.schedule-person:focus-visible {outline:3px solid var(--brand);outline-offset:2px;}
+.schedule-person small {color:var(--muted);font-size:.73rem;font-weight:500;}
+.schedule-empty {display:block;color:var(--muted);text-align:center;padding:.8rem 0;}
+.schedule-section[hidden] {display:none;}
+/* 학년도 정리: 학생별 처리 결과를 눈으로 비교할 수 있는 행 */
+.modal.promotion-dialog {max-width:38rem;}
+.promotion-list {display:flex;flex-direction:column;gap:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+.promotion-row {display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.8rem .1rem;border-bottom:1px solid var(--line);}
+.promotion-row:last-child {border-bottom:0;}
+.promotion-person {display:flex;flex-direction:column;gap:.15rem;min-width:0;}
+.promotion-choice {flex:0 0 11rem;}
+.promotion-select {min-height:2.8rem;}
+.promotion-summary {font-weight:700;color:var(--ink);}
+.promotion-confirm {font-weight:600;cursor:pointer;}
+.promotion-confirm input {width:1.1rem;height:1.1rem;accent-color:var(--brand);}
+@media(max-width:460px) {
+  .promotion-choice {flex:0 0 8.3rem;}
+  .promotion-row {gap:.45rem;}
+}
+.site-credits {display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:.35rem .8rem;line-height:1.6;}
+.credits-label {font-weight:650;color:var(--muted);}
+.credit-person {display:inline-flex;align-items:baseline;gap:.4rem;white-space:nowrap;color:var(--ink);font-weight:550;}
+.credit-person a {font-size:.8rem;font-weight:650;color:var(--brand);text-decoration:none;border-bottom:1px solid transparent;}
+.credit-person a:hover {border-color:currentColor;}
+.credit-person a:focus-visible {outline:2px solid var(--brand);outline-offset:3px;border-radius:2px;}
+.credits-divider {color:var(--muted);}
+@media(max-width:450px) {.credits-divider {display:none;}.credits-label {flex-basis:100%;}}
+/* 월간 달력 */
+.calendar-toolbar {display:flex;align-items:center;justify-content:center;gap:1rem;margin:.5rem 0 1rem;}
+.calendar-scroll {overflow-x:auto;border:1px solid var(--line);border-radius:.65rem;background:var(--surface);}
+.calendar-scroll:focus-visible {outline:3px solid var(--brand);outline-offset:2px;}
+.calendar-grid {display:grid;grid-template-columns:repeat(7,minmax(0,1fr));min-width:650px;}
+.calendar-weekday {padding:.65rem;text-align:center;font-size:.85rem;font-weight:700;background:var(--idle-soft);border-bottom:1px solid var(--line);}
+.calendar-day {font:inherit;color:var(--ink);background:var(--surface);border:0;border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:.6rem;text-align:left;min-height:6.5rem;display:flex;flex-direction:column;gap:.3rem;cursor:pointer;min-width:0;}
+.calendar-day:nth-child(7n) {border-right:0;}
+.calendar-day:hover {background:var(--brand-soft);}
+.calendar-day[aria-pressed="true"] {background:var(--brand-soft);box-shadow:inset 0 0 0 2px var(--brand);}
+.calendar-day:focus-visible {outline:3px solid var(--brand);outline-offset:-3px;}
+.calendar-day.other-month {color:var(--muted);background:var(--idle-soft);}
+.calendar-day-number {font-weight:750;font-size:.95rem;}
+.calendar-day-names {font-size:.77rem;line-height:1.4;overflow-wrap:anywhere;}
+.calendar-day-note,.calendar-day-record {font-size:.73rem;color:var(--brand);font-weight:650;}
+.calendar-details {border:1px solid var(--line);border-radius:.65rem;padding:1.3rem;background:var(--surface);}
+.calendar-detail-title {font-size:.87rem;font-weight:700;margin:1.25rem 0 .5rem;}
+.calendar-detail-list {display:flex;flex-direction:column;gap:.4rem;}
+.calendar-detail-row {display:flex;justify-content:space-between;align-items:center;gap:.8rem;padding:.5rem 0;border-bottom:1px solid var(--line);}
+.calendar-detail-row:last-child {border:0;}
+.calendar-caption {display:block;color:var(--muted);font-size:.83rem;}
+@media(max-width:650px) {.calendar-details {padding:1rem;}.calendar-toolbar {gap:.45rem;}}
+.slot-viewer {display:flex;align-items:center;justify-content:center;gap:.9rem;max-width:35rem;margin:0 auto 1.2rem;}
+.slot-viewer-title {display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:.6rem 1rem;text-align:center;flex:1;}
+.slot-viewer-title .sub {font-size:1.24rem;}
+.slot-arrow {display:grid;place-items:center;width:2.75rem;height:2.75rem;flex:0 0 2.75rem;border:1px solid var(--line);border-radius:.5rem;background:var(--surface);color:var(--ink);font:inherit;font-size:1.75rem;cursor:pointer;}
+.slot-arrow:hover:not(:disabled) {border-color:var(--brand);background:var(--brand-soft);}
+.slot-arrow:disabled {opacity:.3;cursor:default;}
+.slot-arrow:focus-visible,.slot-return:focus-visible {outline:3px solid var(--brand);outline-offset:2px;}
+.slot-return {display:block;margin:-.65rem auto 1rem;border:0;background:transparent;color:var(--muted);font:inherit;font-size:.83rem;cursor:pointer;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:.25em;}
+.slot-readonly {color:var(--muted);font-size:.88rem;text-align:center;margin-bottom:1rem;}
+.school-notice {max-width:37rem;margin:.35rem auto 1.25rem;padding:1rem 1.2rem;border:1px solid var(--line);border-radius:.6rem;background:var(--brand-soft);font-weight:750;text-align:center;color:var(--ink);}
+.school-notice small {display:block;font-weight:500;color:var(--muted);font-size:.82rem;margin-top:.25rem;}
+.school-notice.subtle {background:var(--surface);font-weight:500;}
+@media(max-width:430px) {.slot-viewer {gap:.35rem;}.slot-viewer-title .sub {font-size:1.1rem;}.slot-arrow {width:2.6rem;height:2.6rem;flex-basis:2.6rem;}}
+/* UI 2.1 — 학생 메인 화면은 중앙 집중, 관리자 화면은 넓은 작업 공간 */
+.home-page {max-width:52rem;margin-inline:auto;}
+.home-page .date-title {text-align:center;padding:1rem .25rem 1.75rem;}
+.home-page .date-title .md {display:flex;align-items:baseline;justify-content:center;flex-wrap:wrap;gap:.15rem .75rem;}
+.home-page .date-title .md span {margin-left:0;}
+.home-page .slot-heading {justify-content:center;gap:.65rem 1rem;text-align:center;flex-wrap:wrap;}
+.home-page .slot-heading .sub {font-size:1.2rem;}
+.home-page .grid2 {
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,15rem),19.5rem));
+  justify-content:center;gap:.85rem;width:100%;margin-inline:auto;
+}
+.home-page .duty-card {width:100%;min-height:13rem;}
+.home-page .home-note {text-align:center;}
+.home-page .makeup {max-width:43rem;width:100%;margin:3.25rem auto 0;}
+.home-page > .card.big,.home-page > section > .card.big {max-width:43rem;margin-inline:auto;}
+@media(max-width:680px) {
+  .home-page .date-title {padding:.7rem .15rem 1.35rem;}
+  .home-page .grid2 {grid-template-columns:minmax(0,1fr);max-width:22rem;}
+  .home-page .slot-heading {gap:.35rem .75rem;}
+  .home-page .makeup {margin-top:2.5rem;}
+}
+/* 키오스크 안내문 — 화면의 정보 구조를 만드는 문구이며 장식용 배지가 아니다. */
+.app-eyebrow {font-size:.78rem;letter-spacing:.12em;font-weight:750;color:var(--brand);margin-bottom:.55rem;}
+.slot-heading {padding:.25rem .1rem .9rem;}
+.slot-heading .sub {font-size:1.2rem;font-weight:730;}
+.slot-heading .pill {font-size:.9rem;}
+.home-note {color:var(--muted);font-size:.95rem;margin:.85rem .15rem 0;}
+.admin-section-header {border-bottom:1px solid var(--line);padding-bottom:.8rem;}
+@media(max-width:680px) {
+  header {justify-content:center;margin-bottom:1.1rem;padding:.95rem 0 1rem;}
+  .logo img {width:12rem;}
+  nav {width:100%;min-width:0;}
+  nav button {padding:0 .4rem;}
+  main {width:100%;}
+  .duty-card {min-height:11.5rem;}
+  .member .stats {flex-wrap:wrap;}
+  .between {flex-wrap:wrap;}
+}
+
 </style>
 </head>
 <body>
@@ -141,7 +347,12 @@ h2.sub { font-size: 1.1rem; font-weight: 700; }
   <nav id="nav" aria-label="주 메뉴"></nav>
 </header>
 <main id="main"></main>
-<footer>개발 : 16기 안준표</footer>
+<footer class="site-credits" aria-label="개발 참여자">
+  <span class="credits-label">개발</span>
+  <span class="credit-person">15기 김우준 <a href="https://github.com/WhoSia" target="_blank" rel="noopener noreferrer" aria-label="김우준 GitHub WhoSia">@WhoSia</a></span>
+  <span class="credits-divider" aria-hidden="true">·</span>
+  <span class="credit-person">16기 안준표 <a href="https://github.com/pugmy" target="_blank" rel="noopener noreferrer" aria-label="안준표 GitHub pugmy">@pugmy</a></span>
+</footer>
 
 <?!= HtmlService.createHtmlOutputFromFile('Logo').getContent(); ?>
 <script>
@@ -169,7 +380,64 @@ function h(tag, props, ...kids) {
 const api = (fn, ...args) =>
   new Promise((ok, no) => google.script.run.withSuccessHandler(ok).withFailureHandler(no)[fn](...args));
 
-const errText = (e) => '서버 오류가 발생했습니다. 잠시 후 다시 시도하세요. (' + ((e && e.message) || e) + ')';
+const errText = (e) => {
+  const message = String((e && e.message) || e || '');
+  if (/관리자 로그인|로그인이 만료/.test(message)) return '관리자 로그인이 만료됐습니다. 다시 로그인해 주세요.';
+  return '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+};
+
+// 관리자 토큰은 메모리에만 보관한다. 탭/브라우저를 닫으면 다시 로그인해야 한다.
+let adminToken = '';
+let adminIdleTimer = null;
+const ADMIN_IDLE_MS = 15 * 60 * 1000;
+function renewAdminIdle() {
+  clearTimeout(adminIdleTimer);
+  if (!adminToken) return;
+  adminIdleTimer = setTimeout(() => { if (adminToken) logoutAdmin(); }, ADMIN_IDLE_MS);
+}
+// 공용 PC에서 학생의 일반 출석 조작은 관리자 세션을 연장하지 않는다.
+['pointerdown', 'keydown'].forEach((eventName) => document.addEventListener(eventName, () => {
+  if (adminToken && currentTab !== 'home') renewAdminIdle();
+}));
+const adminApi = async (name, ...args) => {
+  try { return await api(name, ...args, adminToken); }
+  catch (e) {
+    if (/관리자 로그인|로그인이 만료/.test(String((e && e.message) || e))) adminToken = '';
+    throw e;
+  }
+};
+async function logoutAdmin() {
+  const token = adminToken;
+  adminToken = '';
+  clearTimeout(adminIdleTimer);
+  show('home');
+  try { await api('api_adminLogout', token); } catch (_) { /* 로컬 세션은 폐기됨 */ }
+}
+function adminLoginView(destination) {
+  const password = h('input', { type: 'password', class: 'field', autocomplete: 'current-password',
+    'aria-label': '관리자 비밀번호' });
+  const message = h('p', { class: 'msg bad-text', role: 'alert' });
+  const submit = h('button', { type: 'submit', class: 'btn primary lg' }, '로그인');
+  const form = h('form', { class: 'col', onsubmit: async (event) => {
+    event.preventDefault();
+    let response;
+    try { response = await busy(submit, '확인 중...', () => api('api_adminLogin', password.value)); }
+    catch (e) { response = { ok: false, message: errText(e) }; }
+    password.value = '';
+    if (!response.ok) { message.textContent = response.message; return; }
+    adminToken = response.token;
+    renewAdminIdle();
+    show(destination);
+  } });
+  form.append(h('label', { class: 'label' }, '관리자 비밀번호', password), message, submit);
+  return h('section', { class: 'card stack mt5', style: 'gap:1rem' },
+    h('h1', { class: 'title', style: 'margin:0' }, '관리자 로그인'),
+    h('p', { class: 'muted' }, '출석 및 부원 관리는 도서부 담당자만 사용할 수 있습니다.'),
+    form);
+}
+function logoutControl() {
+  return h('button', { type: 'button', class: 'btn ghost sm', onclick: logoutAdmin }, '로그아웃');
+}
 
 const svg = (d, cls) => {
   const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -203,27 +471,53 @@ async function busy(btn, text, fn) {
 
 // ---------- 모달 (바깥 클릭·Esc로 닫힘, 맨 위 모달만 닫는다) ----------
 const stack = [];
+const modalFocusables = (box) =>
+  Array.from(box.querySelectorAll('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'))
+    .filter(el => el.getClientRects().length && el.getAttribute('aria-hidden') !== 'true');
+
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && stack.length) stack[stack.length - 1].tryClose();
+  const active = stack[stack.length - 1];
+  if (!active) return;
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    active.tryClose();
+  } else if (e.key === 'Tab') {
+    // 중첩 확인창에서도 현재 가장 위에 있는 모달 안에서만 이동한다.
+    const focusable = modalFocusables(active.box);
+    if (!focusable.length) { e.preventDefault(); active.box.focus(); return; }
+    const first = focusable[0], last = focusable[focusable.length - 1];
+    if (e.shiftKey && (document.activeElement === first || !active.box.contains(document.activeElement))) {
+      e.preventDefault(); last.focus();
+    } else if (!e.shiftKey && (document.activeElement === last || !active.box.contains(document.activeElement))) {
+      e.preventDefault(); first.focus();
+    }
+  }
 });
 
 function openModal({ label, narrow = false, alert = false, canClose = () => true }, build) {
   const opener = document.activeElement;
-  const box = h('div', { class: 'modal' + (narrow ? ' narrow' : ''), role: alert ? 'alertdialog' : 'dialog', 'aria-modal': 'true', 'aria-label': label });
+  const box = h('div', { class: 'modal' + (narrow ? ' narrow' : ''), role: alert ? 'alertdialog' : 'dialog',
+    'aria-modal': 'true', 'aria-label': label, tabindex: '-1' });
   const back = h('div', { class: 'modal-backdrop', onmousedown: (e) => e.target === back && entry.tryClose() }, box);
-  const entry = {
-    tryClose: () => canClose() && close(),
-  };
+  let closed = false;
+  const entry = { box, tryClose: () => canClose() && close() };
   function close() {
+    if (closed) return;
+    closed = true;
     back.remove();
-    stack.splice(stack.indexOf(entry), 1);
-    if (opener && opener.focus) opener.focus();
+    const index = stack.indexOf(entry);
+    if (index !== -1) stack.splice(index, 1);
+    document.body.classList.toggle('modal-open', stack.length > 0);
+    if (opener && opener.isConnected && opener.focus) opener.focus();
+    else if (stack.length) stack[stack.length - 1].box.focus();
   }
   stack.push(entry);
+  document.body.classList.add('modal-open');
   document.body.append(back);
-  build(box, close);
-  const first = box.querySelector('input, textarea, button');
-  if (first) first.focus();
+  try { build(box, close); }
+  catch (error) { close(); throw error; }
+  const first = modalFocusables(box)[0];
+  (first || box).focus();
 }
 
 function choice(label, options, value, onChange) {
@@ -241,19 +535,247 @@ function choice(label, options, value, onChange) {
   return h('div', { class: 'label', role: 'group', 'aria-label': label }, label, row);
 }
 
+// ---------- 출석 면제 일정 ----------
+function schoolRuleModal(rule) {
+  openModal({ label: '등교·시험 일정 설정' }, (box, close) => {
+    const type = h('select', { class: 'field', 'aria-label': '면제 일정 종류' },
+      h('option', { value: 'closed' }, '휴업·방학·공휴일'),
+      h('option', { value: 'exam' }, '시험'));
+    const start = h('input', { class: 'field', type: 'date', 'aria-label': '시작일' });
+    const end = h('input', { class: 'field', type: 'date', 'aria-label': '종료일' });
+    const name = h('input', { class: 'field', maxlength: '80', placeholder: '예: 2학기 기말고사',
+      'aria-label': '일정 이름' });
+    const note = h('p', { class: 'muted', role: 'note' });
+    const msg = h('p', { role: 'alert', class: 'msg bad-text' });
+    const save = h('button', { class: 'btn primary', type: 'button' }, '저장');
+    if (rule) {
+      type.value = rule.category; start.value = rule.startDate;
+      end.value = rule.endDate; name.value = rule.title;
+    } else {
+      start.value = calendarSelected || new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+      end.value = start.value;
+    }
+    function updateTip() {
+      note.textContent = type.value === 'exam'
+        ? '시험 시작일 14일 전부터 종료일까지 출석 의무가 면제됩니다. 시작일에는 시험 첫날을 입력해 주세요.'
+        : '선택한 기간 동안 출석 의무가 면제됩니다. 공휴일·재량휴업일·연휴·방학에 사용하세요.';
+    }
+    type.addEventListener('change', updateTip);
+    updateTip();
+    save.onclick = async () => {
+      const data = { category: type.value, startDate: start.value,
+        endDate: end.value, title: name.value.trim() };
+      let result;
+      try { result = await busy(save, '저장 중...', () =>
+        adminApi('api_schoolRuleSave', data, rule?.id || 0)); }
+      catch (e) { result = { ok: false, message: errText(e) }; }
+      if (!result.ok) { msg.textContent = result.message; return; }
+      close(); show('calendar');
+    };
+    box.append(h('h2', {}, rule ? '면제 일정 수정' : '면제 일정 등록'),
+      h('label', { class: 'label' }, '종류', type),
+      h('label', { class: 'label' }, '시작일', start),
+      h('label', { class: 'label' }, '종료일', end),
+      h('label', { class: 'label' }, '일정 이름', name), note, msg,
+      h('div', { class: 'actions' },
+        h('button', { type: 'button', class: 'btn ghost', onclick: close }, '취소'), save));
+  });
+}
+async function schoolRulesModal() {
+  const rules = await adminApi('api_schoolRules');
+  openModal({ label: '등교·시험 일정 관리' }, (box, close) => {
+    const list = rules.map(rule =>
+      h('li', { class: 'calendar-detail-row' },
+        h('div', {},
+          h('strong', {}, rule.title),
+          h('small', { class: 'calendar-caption' },
+            rule.startDate + (rule.endDate !== rule.startDate ? ' ~ ' + rule.endDate : '') +
+            ' · ' + (rule.category === 'exam' ? '시험' : '휴업·방학'))),
+        h('div', { class: 'row wrap' },
+          h('button', { type: 'button', class: 'btn ghost sm',
+            onclick: () => { close(); schoolRuleModal(rule); } }, '수정'),
+          h('button', { type: 'button', class: 'btn ghost sm', onclick: async () => {
+            if (!confirm('이 면제 일정을 해제할까요?')) return;
+            let result;
+            try { result = await adminApi('api_schoolRuleCancel', rule.id); }
+            catch (e) { result = { ok: false, message: errText(e) }; }
+            if (!result.ok) { alert(result.message); return; }
+            close(); show('calendar');
+          } }, '해제'))));
+    box.append(h('h2', {}, '등교·시험 일정'),
+      h('p', { class: 'muted' }, '시험 첫날과 휴업 기간을 설정합니다. 과거 날짜도 정정할 수 있습니다.'),
+      h('ul', { class: 'calendar-detail-list' },
+        list.length ? list : [h('li', { class: 'muted' }, '등록된 면제 일정이 없습니다.')]),
+      h('div', { class: 'actions' },
+        h('button', { type: 'button', class: 'btn ghost', onclick: close }, '닫기'),
+        h('button', { type: 'button', class: 'btn primary',
+          onclick: () => { close(); schoolRuleModal(null); } }, '+ 일정 등록')));
+  });
+}
+
+// ---------- 월간 일정 ----------
+const CALENDAR_LABELS = { activity: '활동·행사', makeup_plan: '보충 예정', notice: '메모' };
+let calendarMonth = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' }).slice(0, 7);
+let calendarSelected = '';
+function calendarMove(month, delta) {
+  const [year, number] = month.split('-').map(Number);
+  return new Date(Date.UTC(year, number - 1 + delta, 1)).toISOString().slice(0, 7);
+}
+function calendarNoteModal(date) {
+  openModal({ label: '일정 등록' }, (box, close) => {
+    const title = h('input', { class: 'field', placeholder: '일정 이름', maxlength: '80', 'aria-label': '일정 이름' });
+    const detail = h('textarea', { class: 'field', rows: '3', maxlength: '300',
+      placeholder: '필요하면 메모를 적어 주세요.', 'aria-label': '일정 메모' });
+    const type = h('select', { class: 'field', 'aria-label': '일정 종류' },
+      Object.entries(CALENDAR_LABELS).map(([value, label]) => h('option', { value }, label)));
+    const member = h('select', { class: 'field', 'aria-label': '보충 예정 부원' });
+    const memberRow = h('label', { class: 'label' }, '보충 예정 부원', member);
+    memberRow.hidden = true;
+    type.addEventListener('change', () => { memberRow.hidden = type.value !== 'makeup_plan'; });
+    const info = h('p', { class: 'msg bad-text', role: 'alert' });
+    const save = h('button', { class: 'btn primary', type: 'button' }, '일정 저장');
+    save.onclick = async () => {
+      const payload = {
+        date, category: type.value, title: title.value.trim(), detail: detail.value.trim(),
+        userId: type.value === 'makeup_plan' ? Number(member.value) : 0
+      };
+      if (!payload.title) { info.textContent = '일정 이름을 입력해 주세요.'; return; }
+      try {
+        const res = await busy(save, '저장 중...', () => adminApi('api_calendarAdd', payload));
+        if (!res.ok) { info.textContent = res.message; return; }
+        close(); show('calendar');
+      } catch (e) { info.textContent = errText(e); }
+    };
+    box.append(h('h2', {}, '일정 등록'), h('p', { class: 'muted' }, date),
+      h('label', { class: 'label' }, '종류', type), memberRow,
+      h('label', { class: 'label' }, '일정 이름', title),
+      h('label', { class: 'label' }, '메모', detail), info,
+      h('div', { class: 'actions' },
+        h('button', { class: 'btn ghost', type: 'button', onclick: close }, '취소'), save));
+    adminApi('api_members').then(users => {
+      users.filter(u => u.type === 1).forEach(u =>
+        member.append(h('option', { value: String(u.id) }, u.name + ' · ' + u.grade + '학년')));
+    }).catch(() => { info.textContent = '부원 명단을 불러오지 못했습니다.'; });
+  });
+}
+async function renderCalendar() {
+  const data = await adminApi('api_calendarMonth', calendarMonth);
+  if (!data.ok) throw new Error(data.message || '달력을 불러오지 못했습니다.');
+  if (!data.days.some(d => d.date === calendarSelected && d.inMonth)) {
+    const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Seoul' });
+    calendarSelected = data.days.find(d => d.date === today && d.inMonth)?.date ||
+      data.days.find(d => d.inMonth)?.date || '';
+  }
+  const dayDetail = h('section', { class: 'calendar-details', 'aria-live': 'polite' });
+  const shiftNames = { 1: '점심 전', 3: '점심 후', 2: '저녁' };
+  let grid;
+  function detail(date) {
+    const day = data.days.find(d => d.date === date);
+    if (!day) return;
+    calendarSelected = date;
+    const slots = day.slots.map(slot =>
+      h('li', { class: 'calendar-detail-row' },
+        h('span', { class: 'bold' }, shiftNames[slot.shift]),
+        h('span', {}, day.verified ?
+          (slot.members.length ? slot.members.map(m => m.name).join(', ') : '—') : '이력 미확인')));
+    const notes = day.notes.map(note =>
+      h('li', { class: 'calendar-detail-row' },
+        h('span', {}, CALENDAR_LABELS[note.category] + ' · ' +
+          (note.name ? note.name + ' · ' : '') + note.title,
+          note.detail ? h('small', { class: 'calendar-caption' }, note.detail) : null),
+        h('button', { type: 'button', class: 'btn ghost sm', onclick: async () => {
+          if (!confirm('이 일정을 삭제할까요?')) return;
+          try {
+            const res = await adminApi('api_calendarDelete', note.id);
+            if (res.ok) show('calendar'); else alert(res.message);
+          } catch (e) { alert(errText(e)); }
+        } }, '삭제')));
+    const records = day.records.map(rec =>
+      h('li', { class: 'calendar-detail-row' }, rec.name + ' · ' +
+        ({ duty: '출석 완료', makeup: '보충 완료', absent: '결석' })[rec.kind]));
+    dayDetail.replaceChildren(
+      h('div', { class: 'between' },
+        h('h2', { class: 'sub' }, date + ' 일정'),
+        h('div', { class: 'row wrap' },
+          h('button', { class: 'btn ghost sm', type: 'button', onclick: () => {
+            adminDate = date; show('admin');
+          } }, '출석 기록 보기'),
+          h('button', { class: 'btn primary sm', type: 'button', onclick: () => calendarNoteModal(date) }, '+ 일정 추가'))),
+      day.school?.all && h('p', { class: 'school-notice', role: 'note' },
+        day.school.reasons.some(r => r.category === 'exam') ? '시험 기간입니다' : '출석 의무가 없는 날입니다',
+        h('small', {}, day.school.reasons.map(r => r.title).join(' · '))),
+      day.needsReview && h('p', { class: 'bad-text', role: 'note' },
+        '이 날짜에 면제 대상 결석 기록이 있습니다. 출석 관리에서 확인해 주세요.'),
+      !day.verified && h('p', { class: 'muted' }, '이력 도입 전 시간표는 확인되지 않습니다.'),
+      h('h3', { class: 'calendar-detail-title' }, '정규 당번'),
+      h('ul', { class: 'calendar-detail-list' }, slots),
+      h('h3', { class: 'calendar-detail-title' }, '등록된 일정'),
+      h('ul', { class: 'calendar-detail-list' },
+        notes.length ? notes : [h('li', { class: 'muted' }, '등록된 일정이 없습니다.')]),
+      h('h3', { class: 'calendar-detail-title' }, '출석 기록'),
+      h('ul', { class: 'calendar-detail-list' },
+        records.length ? records : [h('li', { class: 'muted' }, '출석 기록이 없습니다.')]));
+  }
+  const headings = ['월', '화', '수', '목', '금', '토', '일'].map(day =>
+    h('span', { class: 'calendar-weekday' }, day));
+  const cells = data.days.map(day => {
+    const names = day.verified ? day.slots.flatMap(slot => slot.members.map(m => m.name)) : [];
+    const button = h('button', { type: 'button',
+      class: 'calendar-day' + (day.inMonth ? '' : ' other-month'),
+      'aria-label': day.date + ' · 당번 ' + names.length + '명 · 일정 ' + day.notes.length + '건',
+      'aria-pressed': String(day.date === calendarSelected),
+      onclick: () => {
+        Array.from(grid.querySelectorAll('button')).forEach(el => el.setAttribute('aria-pressed', 'false'));
+        button.setAttribute('aria-pressed', 'true');
+        detail(day.date);
+      }
+    },
+      h('span', { class: 'calendar-day-number' }, String(Number(day.date.slice(-2)))),
+      names.length ? h('span', { class: 'calendar-day-names' },
+        names.slice(0, 2).join(', ') + (names.length > 2 ? ' 외 ' + (names.length - 2) + '명' : '')) : null,
+      day.school?.all ? h('span', { class: 'calendar-day-note' },
+        day.school.reasons.some(r => r.category === 'exam') ? '시험' : '휴업') : null,
+      day.notes.length ? h('span', { class: 'calendar-day-note' }, '일정 ' + day.notes.length) : null,
+      day.records.some(rec => rec.kind === 'makeup') ?
+        h('span', { class: 'calendar-day-record' }, '보충 완료') : null);
+    return button;
+  });
+  grid = h('div', { class: 'calendar-grid', role: 'group', 'aria-label': calendarMonth + ' 월간 달력' }, headings, cells);
+  detail(calendarSelected);
+  return h('div', { class: 'stack' },
+    h('div', { class: 'between' },
+      h('div', {}, h('h1', { class: 'title' }, '도서관 일정'),
+        h('p', { class: 'muted' }, '날짜를 선택해 당번과 행사, 보충 예정 및 출석 기록을 확인하세요.')),
+      h('div', { class: 'row wrap' },
+        h('button', { class: 'btn ghost sm', type: 'button', onclick: async () => {
+          try { await schoolRulesModal(); } catch (e) { alert(errText(e)); }
+        } }, '등교·시험 일정'),
+        logoutControl())),
+    h('div', { class: 'calendar-toolbar' },
+      h('button', { type: 'button', class: 'btn ghost sm',
+        onclick: () => { calendarMonth = calendarMove(calendarMonth, -1); show('calendar'); } }, '이전 달'),
+      h('h2', { class: 'sub' }, calendarMonth.replace('-', '년 ') + '월'),
+      h('button', { type: 'button', class: 'btn ghost sm',
+        onclick: () => { calendarMonth = calendarMove(calendarMonth, 1); show('calendar'); } }, '다음 달')),
+    h('div', { class: 'calendar-scroll', tabindex: '0' }, grid), dayDetail,
+    h('p', { class: 'muted' }, '행사와 보충 예정은 일정 표시이며, 출석 인정이나 결석 면제에 자동 반영되지 않습니다.'));
+}
+
 // ---------- 탭 ----------
-const tabs = { home: ['출석체크', renderHome], admin: ['출석관리', renderAdmin], member: ['부원관리', renderMember] };
+const tabs = { home: ['출석체크', renderHome], admin: ['출석관리', renderAdmin], member: ['부원관리', renderMember], calendar: ['달력', renderCalendar] };
 const nav = document.getElementById('nav');
 const main = document.getElementById('main');
 let token = 0;
+let currentTab = 'home';
 
 async function show(name) {
+  currentTab = name;
   const mine = ++token;
   for (const b of nav.children) b.removeAttribute('aria-current');
   nav.querySelector('[data-tab="' + name + '"]').setAttribute('aria-current', 'page');
   main.replaceChildren(skeleton('1.5rem', '9rem', '3rem'));
   try {
-    const el = await tabs[name][1]();
+    const el = name !== 'home' && !adminToken ? adminLoginView(name) : await tabs[name][1]();
     if (mine === token) main.replaceChildren(el);
   } catch (e) {
     if (mine === token) main.replaceChildren(h('div', { class: 'card big' }, h('p', { class: 'bad-text bold' }, errText(e)), h('button', { class: 'btn ghost mt4', onclick: () => show(name) }, '다시 시도')));
@@ -357,36 +879,70 @@ function makeupSection(d) {
 
   return h('section', { class: 'makeup', 'aria-labelledby': 'makeup-title' },
     h('h2', { class: 'sub', id: 'makeup-title' }, '보충 출석'),
+    h('p', { class: 'muted' }, '정규 당번이 아닌 날의 도서관 활동을 기록합니다.'),
     h('div', { class: 'label' }, '부원', pick),
     h('label', { class: 'label' }, '특이사항', detail),
     msg, submit);
 }
 
+let homeViewedShift = null;
 async function renderHome() {
   const d = await api('api_home');
-  const fmt = (o) => new Date().toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', ...o });
-
-  let duty;
-  if (!d.current) {
-    duty = h('section', { class: 'card big mt4' }, h('p', { class: 'bold', style: 'font-size:1.25rem' }, '없음'));
-  } else {
-    duty = h('section', { class: 'mt4', 'aria-labelledby': 'duty-title' },
-      h('div', { class: 'between', style: 'padding:0 .25rem .75rem' },
-        h('h2', { class: 'sub', id: 'duty-title' }, '지금 ' + SHIFT[d.current.shift] + ' 당번'),
-        h('span', { class: 'pill info' }, TIME[d.current.shift])),
-      d.duty.length
-        ? h('ul', { class: 'grid2' }, d.duty.map((m) =>
-            h('li', { class: 'card duty-card' }, h('span', { class: 'duty-name' }, m.name), attendButton(m))))
-        : h('div', { class: 'card big' }, h('p', { class: 'bold', style: 'font-size:1.25rem' }, '오늘 ' + SHIFT[d.current.shift] + ' 당번은 없어요')));
-  }
-
-  return h('div', { class: 'stack' },
+  const displayDate = /^\d{4}-\d{2}-\d{2}$/.test(d.today || '')
+    ? new Date(d.today + 'T12:00:00+09:00') : new Date();
+  const fmt = (o) => displayDate.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', ...o });
+  const shifts = [1, 3, 2];
+  const actual = d.current?.shift || null;
+  if (!shifts.includes(homeViewedShift)) homeViewedShift = actual || 1;
+  const selected = homeViewedShift;
+  const selectedIndex = shifts.indexOf(selected);
+  const list = d.slots?.find(slot => slot.shift === selected)?.duty ||
+    (actual === selected ? d.duty : []);
+  const exempt = d.exemption?.all === true;
+  const reasons = d.exemption?.reasons || [];
+  const closed = reasons.some(reason => reason.category === 'closed');
+  const exam = reasons.some(reason => reason.category === 'exam');
+  const active = !exempt && actual === selected;
+  const changeShift = (next) => { homeViewedShift = next; show('home'); };
+  const duty = h('section', { class: 'mt4', 'aria-labelledby': 'duty-title' },
+    h('div', { class: 'slot-viewer' },
+      h('button', { type: 'button', class: 'slot-arrow', disabled: selectedIndex === 0,
+        'aria-label': '이전 시간대 보기', onclick: () => changeShift(shifts[selectedIndex - 1]) }, '‹'),
+      h('div', { class: 'slot-viewer-title' },
+        h('h2', { class: 'sub', id: 'duty-title' }, SHIFT[selected] + ' 당번'),
+        h('span', { class: 'pill info' }, TIME[selected])),
+      h('button', { type: 'button', class: 'slot-arrow', disabled: selectedIndex === shifts.length - 1,
+        'aria-label': '다음 시간대 보기', onclick: () => changeShift(shifts[selectedIndex + 1]) }, '›')),
+    selected !== actual && actual &&
+      h('button', { type: 'button', class: 'slot-return', onclick: () => changeShift(actual) }, '현재 당번으로'),
+    exam && h('p', { class: 'school-notice', role: 'status' }, '시험 기간입니다',
+      h('small', {}, '시험 준비 기간과 시험 기간에는 당번 출석 의무가 없습니다.')),
+    !exam && exempt && h('p', { class: 'school-notice', role: 'status' },
+      closed ? '오늘은 등교하지 않는 날입니다' : '오늘은 출석 의무가 없습니다',
+      reasons[0]?.title ? h('small', {}, reasons[0].title) : null),
+    !exempt && !actual && h('p', { class: 'school-notice subtle', role: 'status' },
+      '현재는 출석 시간이 아닙니다. 다른 시간대의 담당자는 열람만 할 수 있습니다.'),
+    !exempt && actual !== selected && h('p', { class: 'slot-readonly' },
+      '다른 시간대의 담당자를 보고 있습니다. 이 화면에서는 출석할 수 없습니다.'),
+    list.length
+      ? h('ul', { class: 'grid2' }, list.map(m =>
+          h('li', { class: 'card duty-card' },
+            h('span', { class: 'duty-name' }, m.name),
+            active ? attendButton(m) :
+              h('span', { class: 'pill idle', style: 'align-self:center' },
+                exempt ? '출석 면제' : m.attended ? '출석 완료' : '담당자'))))
+      : h('div', { class: 'card big' },
+        h('p', { class: 'bold' }, '이 시간대에 배정된 부원이 없습니다.')));
+  return h('div', { class: 'stack home-page' },
     h('h1', { class: 'sr-only' }, '출석체크'),
     h('div', { class: 'date-title' },
+      h('p', { class: 'app-eyebrow' }, 'LIBRARY ATTENDANCE'),
       h('p', { class: 'y' }, fmt({ year: 'numeric' })),
-      h('p', { class: 'md' }, fmt({ month: 'long', day: 'numeric' }), h('span', {}, fmt({ weekday: 'long' })))),
+      h('p', { class: 'md' }, fmt({ month: 'long', day: 'numeric' }),
+        h('span', {}, fmt({ weekday: 'long' })))),
     duty,
-    makeupSection(d));
+    active && h('p', { class: 'home-note' }, '본인의 이름을 선택해 출석을 기록해 주세요.'),
+    !closed && makeupSection(d));
 }
 
 // ---------- 출석관리 ----------
@@ -396,7 +952,7 @@ function detailLine(text) { return h('p', { class: 'detail' }, '특이사항: ' 
 function nameLine(u) { return h('span', { class: 'bold' }, u.name, ' ', h('span', { class: 'name-sub' }, u.grade + '학년')); }
 
 async function renderAdmin() {
-  const d = await api('api_admin', adminDate);
+  const d = await adminApi('api_admin', adminDate);
   adminDate = d.date;
   const picker = h('div', { class: 'row wrap' },
     h('input', {
@@ -404,19 +960,25 @@ async function renderAdmin() {
       onchange: (e) => { if (e.target.value) { adminDate = e.target.value; show('admin'); } },
     }),
     h('button', { type: 'button', class: 'btn ghost', onclick: () => csvModal(d.today) }, 'CSV 내보내기'));
-  const title = h('h1', { class: 'title' }, '출석 관리');
+  const title = h('div', { class: 'between' },
+    h('h1', { class: 'title' }, '출석 관리'), logoutControl());
+  const historyNotice = d.rosterVerified === false
+    ? h('p', { class: 'detail', role: 'note' },
+        '이력 기록을 시작하기 전 날짜입니다. 당시 당번·학년 정보는 현재 등록 정보가 표시될 수 있습니다.')
+    : null;
 
-  if (!d.day) return h('div', { class: 'stack' }, title, picker, h('div', { class: 'card big mt5' }, h('p', { class: 'bold', style: 'font-size:1.1rem' }, '주말에는 당번이 없어요')));
+  if (!d.day) return h('div', { class: 'stack' }, title, picker, h('div', { class: 'card big mt5' }, h('p', { class: 'bold', style: 'font-size:1.1rem' }, '주말에는 정규 당번이 없습니다.')));
 
   const duty = d.records.filter((r) => r.kind === 'duty');
   const makeup = d.records.filter((r) => r.kind === 'makeup');
   const absent = d.records.filter((r) => r.kind === 'absent');
+  const excused = d.records.filter((r) => r.kind === 'excused');
   const onDuty = d.users.filter((u) => u.day === d.day);
   const madeUp = d.users.filter((u) => makeup.some((r) => r.userId === u.id));
   const weekday = DAYS[d.day - 1];
 
   const shiftSections = [1, 3, 2].map((shift) => {
-    const members = onDuty.filter((u) => u.shift === shift);
+    const members = d.rosterByShift ? (d.rosterByShift[shift] || []) : onDuty.filter((u) => u.shift === shift);
     const present = members.filter((u) => duty.some((r) => r.userId === u.id)).length;
     return h('section', { class: 'mt5' },
       h('div', { class: 'between', style: 'padding:0 .25rem .5rem' },
@@ -425,22 +987,43 @@ async function renderAdmin() {
       members.length === 0
         ? h('p', { class: 'card muted' }, '당번 없음')
         : h('ul', { class: 'col', style: 'gap:.5rem' }, members.map((u) => {
-            const rec = duty.find((r) => r.userId === u.id);
-            const miss = absent.some((a) => a.userId === u.id && a.shift === shift);
-            // 휴업일, 시험 기간 등 학사일정 때문에 결석을 기록하지 않는 날
-            const free = !rec && !miss && d.exempt && (d.exempt.all || d.exempt.grades[u.grade]);
+            const rec = duty.find((r) => r.userId === u.id && r.shift === shift);
+            const miss = absent.find((r) => r.userId === u.id && r.shift === shift);
+            const corrected = excused.find((r) => r.userId === u.id && r.shift === shift);
+            const exempt = d.exempt && (d.exempt.all || d.exempt.grades[u.grade]);
+            const free = !rec && !miss && !corrected && exempt;
+            const review = !!miss && !!exempt;
+            const badge = rec ? '출석' : corrected ? '면제 정정' :
+              review ? '면제 정정 필요' : miss ? '결석' : free ? '면제' : '미출석';
+            const correctionButton = review && h('button', {
+              type: 'button', class: 'btn ghost sm',
+              onclick: async () => {
+                if (!confirm(u.name + ' 학생의 ' + d.date + ' 결석을 면제로 정정할까요?')) return;
+                try {
+                  const result = await adminApi('api_excuseAbsence', miss.id);
+                  if (result.ok) show('admin'); else alert(result.message);
+                } catch (e) { alert(errText(e)); }
+              }
+            }, '면제 정정');
             return h('li', { class: 'card' },
-              h('div', { class: 'between' }, nameLine(u), h('span', { class: 'pill ' + (rec ? 'ok' : miss ? 'bad' : free ? 'info' : 'idle') }, rec ? '출석' : miss ? '결석' : free ? '면제' : '미출석')),
-              rec && rec.detail && detailLine(rec.detail));
+              h('div', { class: 'between' }, nameLine(u),
+                h('div', { class: 'row wrap' },
+                  h('span', { class: 'pill ' + (rec ? 'ok' : miss && !review ? 'bad' : free || corrected || review ? 'info' : 'idle') }, badge),
+                  correctionButton)),
+              rec && rec.detail && detailLine(rec.detail),
+              corrected && h('p', { class: 'muted' }, '관리자가 면제로 정정한 기록입니다.'));
           })));
   });
 
-  return h('div', { class: 'stack' }, title, picker,
+  return h('div', { class: 'stack' }, title, picker, historyNotice,
+    d.exempt?.all && h('p', { class: 'school-notice', role: 'status' },
+      d.exempt.reasons?.some(r => r.category === 'exam') ? '시험 기간입니다' : '출석 의무가 없는 날입니다',
+      h('small', {}, (d.exempt.reasons || []).map(r => r.title).join(' · '))),
     h('h2', { class: 'sec mt8' }, d.date + ' ', h('span', { class: 'name-sub', style: 'font-size:inherit;font-weight:800;color:var(--brand)' }, '(' + weekday + ')'), ' 당번'),
     shiftSections,
     h('h2', { class: 'sec mt10' }, '보충'),
     h('ul', { class: 'col mt3', style: 'gap:.5rem' },
-      madeUp.length === 0 && h('li', { class: 'card muted' }, '보충한 부원 없음'),
+      madeUp.length === 0 && h('li', { class: 'card muted' }, '보충 출석 기록이 없습니다.'),
       madeUp.map((u) =>
         h('li', { class: 'card' },
           h('div', { class: 'between' }, nameLine(u), h('span', { class: 'pill info' }, '보충 완료')),
@@ -457,7 +1040,7 @@ function csvModal(today) {
       msg.textContent = '';
       if (!from.value || !to.value || to.value < from.value) { msg.textContent = '종료일은 시작일 이후여야 합니다.'; return; }
       let r;
-      try { r = await busy(go, '만드는 중...', () => api('api_csv', from.value, to.value)); }
+      try { r = await busy(go, '만드는 중...', () => adminApi('api_csv', from.value, to.value)); }
       catch (e) { msg.textContent = errText(e); return; }
       if (!r.ok) { msg.textContent = r.message; return; }
       // BOM을 붙여야 엑셀에서 한글이 깨지지 않는다
@@ -476,6 +1059,136 @@ function csvModal(today) {
   });
 }
 
+const ROSTER_AUDIT_LABEL = {
+  MISSING_BASELINE: '시간표 기준 기록이 없습니다',
+  INVALID_USER_ID: '부원 식별자가 올바르지 않습니다',
+  INVALID_EVENT: '시간표 변경 기록의 형식이 잘못됐습니다',
+  DUPLICATE_EVENT_ID: '변경 기록 번호가 중복됩니다',
+  INVALID_PATCH: '시간표 변경 내용이 올바르지 않습니다',
+  ORPHAN_EVENT: '존재하지 않는 부원을 참조하는 기록입니다',
+  MISSING_HISTORY: '부원의 최초 시간표 기록이 없습니다',
+  BEFORE_BASELINE: '기준 시점보다 이전의 변경 기록입니다',
+  FUTURE_EVENT: '미래 시각의 변경 기록입니다',
+  CURRENT_MISMATCH: '현재 시간표와 변경 기록이 일치하지 않습니다',
+};
+// 시간표 이력을 수정하지 않는 읽기 전용 점검.
+async function inspectRoster() {
+  openModal({ label: '시간표 이력 점검' }, (box, close) => {
+    const message = h('p', { class: 'muted', role: 'status' }, '현재 시간표와 변경 기록을 확인하고 있습니다.');
+    box.append(h('h2', {}, '시간표 이력 점검'), message,
+      h('div', { class: 'actions' }, h('button', { type: 'button', class: 'btn ghost', onclick: close }, '닫기')));
+    adminApi('api_rosterAudit').then((result) => {
+      message.textContent = result.ok
+        ? '문제가 발견되지 않았습니다. 부원 ' + result.members + '명, 변경 기록 ' + result.events + '건을 확인했습니다.'
+        : '확인이 필요한 항목 ' + result.errors.length + '건이 있습니다.';
+      message.className = 'msg ' + (result.ok ? 'ok-text' : 'bad-text');
+      if (!result.ok) {
+        box.append(h('ul', { class: 'col mt3' }, result.errors.slice(0, 30).map((error) =>
+          h('li', { class: 'detail' }, (ROSTER_AUDIT_LABEL[error.code] || '시간표 이력을 확인해 주세요') + ' · 부원 ID ' + (error.userId || '-') +
+            (error.id ? ' · 기록 ID ' + error.id : '')))));
+        if (result.errors.length > 30) box.append(h('p', { class: 'muted' }, '나머지 항목은 원본 시트에서 확인해 주세요.'));
+      }
+    }).catch((error) => {
+      message.className = 'msg bad-text';
+      message.textContent = errText(error);
+    });
+  });
+}
+// 관리자가 명단을 확인한 뒤 진급을 실행한다. 학생 출석에는 영향이 없다.
+async function openPromotion() {
+  openModal({ label: '학년도 명단 정리', narrow: false }, (box, close) => {
+    box.classList.add('promotion-dialog');
+    const content = h('div', { class: 'col' },
+      h('p', { class: 'muted', role: 'status' }, '명단을 불러오는 중입니다.'));
+    box.append(h('h2', {}, '학년도 명단 정리'), content,
+      h('div', { class: 'actions' },
+        h('button', { class: 'btn ghost', type: 'button', onclick: close }, '닫기')));
+    adminApi('api_promotionPreview').then((preview) => {
+      if (!preview.ok) {
+        content.replaceChildren(h('p', { class: 'bad-text' }, preview.message));
+        return;
+      }
+      if (preview.done) {
+        content.replaceChildren(h('p', {}, preview.year + '학년도 명단 정리를 마쳤습니다.'));
+        return;
+      }
+      if (preview.reviewRequired) {
+        content.replaceChildren(
+          h('p', { class: 'bad-text bold' }, '이전 작업의 처리 결과를 먼저 확인해 주세요.'),
+          h('p', { class: 'muted' }, '중복 적용을 막기 위해 정리를 중단했습니다. 이력 점검 후 담당자가 원본 명단을 확인해야 합니다.'));
+        return;
+      }
+
+      const optionsFor = (m) => [
+        ['promote', '진급 → ' + (m.fromGrade + 1) + '학년'],
+        ['graduate', '졸업 처리'],
+        ['exclude', '명단 제외'],
+        ['keep', '현 상태 유지']
+      ].filter(([action]) => action !== 'promote' || m.fromGrade < 3);
+      const selected = new Map();
+      const summary = h('p', { class: 'promotion-summary', role: 'status', 'aria-live': 'polite' });
+      const confirm = h('input', { type: 'checkbox', 'aria-label': '명단 정리 내용 확인' });
+      const apply = h('button', { type: 'button', class: 'btn primary', disabled: true }, '변경 사항 적용');
+      const status = h('p', { role: 'alert', class: 'msg bad-text' });
+      const recalc = () => {
+        const counts = { promote: 0, graduate: 0, exclude: 0, keep: 0 };
+        selected.forEach((action) => { counts[action]++; });
+        summary.textContent =
+          '진급 ' + counts.promote + '명 · 졸업 ' + counts.graduate +
+          '명 · 명단 제외 ' + counts.exclude + '명 · 유지 ' + counts.keep + '명';
+        apply.disabled = !confirm.checked || !preview.members.length;
+      };
+
+      const list = h('ul', { class: 'promotion-list' },
+        preview.members.map((m) => {
+          const choose = h('select', {
+            class: 'field promotion-select', 'aria-label': m.name + ' 처리 방법'
+          }, optionsFor(m).map(([value, label]) => h('option', { value }, label)));
+          choose.value = m.action;
+          selected.set(m.id, m.action);
+          choose.addEventListener('change', () => {
+            selected.set(m.id, choose.value);
+            confirm.checked = false;
+            status.textContent = '';
+            recalc();
+          });
+          return h('li', { class: 'promotion-row' },
+            h('div', { class: 'promotion-person' },
+              h('span', { class: 'bold' }, m.name),
+              h('span', { class: 'name-sub' }, '현재 ' + m.fromGrade + '학년')),
+            h('label', { class: 'promotion-choice' },
+              h('span', { class: 'sr-only' }, m.name + ' 처리 방법'), choose));
+        }));
+
+      confirm.addEventListener('change', recalc);
+      apply.onclick = async () => {
+        const expected = preview.members.map(m => m.id + ':' + m.fromGrade);
+        const decisions = preview.members.map(m => ({ id: m.id, action: selected.get(m.id) }));
+        let result;
+        try {
+          result = await busy(apply, '반영 중...', () =>
+            adminApi('api_applyPromotion', preview.year, expected, decisions));
+        } catch (e) { result = { ok: false, message: errText(e) }; }
+        if (result.ok) { close(); show('member'); }
+        else {
+          status.textContent = result.message;
+          confirm.checked = false;
+          recalc();
+        }
+      };
+      recalc();
+      content.replaceChildren(
+        h('p', { class: 'muted' }, preview.year + '학년도 · 기존 재학생 ' + preview.members.length + '명'),
+        h('p', {}, '학생별 처리 방법을 확인해 주세요.'),
+        h('p', { class: 'muted' },
+          '졸업은 학년과 관계없이 같은 항목에서 처리합니다. 명단 제외·진급 유예는 아래에서, 신입생 등록은 부원 관리에서 선택하세요.'),
+        list, summary,
+        h('label', { class: 'row wrap promotion-confirm' }, confirm, '위 내용을 확인했습니다.'),
+        status, apply);
+    }).catch((e) => { content.replaceChildren(h('p', { class: 'bad-text' }, errText(e))); });
+  });
+}
+
 // ---------- 부원관리 ----------
 function memberModal(member) {
   openModal({ label: member ? '부원 수정' : '부원 추가' }, (box, close) => {
@@ -483,12 +1196,37 @@ function memberModal(member) {
     const name = h('input', { class: 'field', value: f.name, 'aria-label': '이름' });
     const msg = h('p', { class: 'msg bad-text', role: 'status' });
     const save = h('button', { type: 'button', class: 'btn primary' }, member ? '저장' : '추가');
-    save.onclick = async () => {
-      const data = { name: name.value, grade: f.grade, day: f.day, shift: f.shift };
-      let r;
-      try { r = await busy(save, '저장 중...', () => (member ? api('api_updateMember', member.id, data) : api('api_addMember', data))); }
-      catch (e) { r = { ok: false, message: errText(e) }; }
-      if (r.ok) { close(); show('member'); } else msg.textContent = r.message;
+    save.onclick = () => {
+      const data = { name: name.value.trim(), grade: f.grade, day: f.day, shift: f.shift };
+      if (!data.name) { msg.textContent = '이름을 입력해 주세요.'; name.focus(); return; }
+      if (member && ['name', 'grade', 'day', 'shift'].every(k => member[k] === data[k])) {
+        msg.textContent = '변경된 내용이 없습니다.';
+        return;
+      }
+      let pending = false;
+      openModal({ label: '부원 정보 확인', alert: true, narrow: true, canClose: () => !pending }, (confirmation, dismiss) => {
+        const send = h('button', { type: 'button', class: 'btn primary' }, member ? '수정 확정' : '등록 확정');
+        const cancel = h('button', { type: 'button', class: 'btn ghost', onclick: dismiss }, '다시 확인');
+        send.onclick = async () => {
+          pending = true;
+          cancel.disabled = true;
+          let r;
+          try { r = await busy(send, '저장 중...', () =>
+            member ? adminApi('api_updateMember', member.id, data) : adminApi('api_addMember', data)); }
+          catch (e) { r = { ok: false, message: errText(e) }; }
+          pending = false;
+          cancel.disabled = false;
+          if (!r.ok) { dismiss(); msg.textContent = r.message; return; }
+          dismiss();
+          close();
+          show('member');
+        };
+        confirmation.append(
+          h('h3', {}, member ? '변경할 부원 정보를 확인해 주세요.' : '새 부원을 등록할까요?'),
+          h('p', { class: 'detail' },
+            data.name + ' · ' + data.grade + '학년 · ' + DAYS[data.day - 1] + '요일 · ' + SHIFT[data.shift]),
+          h('div', { class: 'actions' }, cancel, send));
+      });
     };
     box.append(
       h('h2', {}, member ? '부원 수정' : '부원 추가'),
@@ -505,20 +1243,23 @@ function memberModal(member) {
 function deleteModal(m) {
   let pending = false;
   openModal({ label: '부원 삭제 확인', alert: true, narrow: true, canClose: () => !pending }, (box, close) => {
-    const del = h('button', { type: 'button', class: 'btn danger-solid' }, '삭제');
+    const del = h('button', { type: 'button', class: 'btn danger-solid' }, '명단에서 제외');
     const cancel = h('button', { type: 'button', class: 'btn ghost', onclick: close }, '취소');
     del.onclick = async () => {
       pending = true;
       cancel.disabled = true;
-      try { await busy(del, '삭제 중...', () => api('api_deleteMember', m.id)); }
-      catch (e) { alert(errText(e)); }
+      let result;
+      try { result = await busy(del, '삭제 중...', () => adminApi('api_deleteMember', m.id)); }
+      catch (e) { result = { ok: false, message: errText(e) }; }
       pending = false;
+      cancel.disabled = false;
+      if (!result.ok) { alert(result.message); return; }
       close();
       show('member');
     };
     box.append(
-      h('h3', {}, m.name + ' 부원을 삭제할까요?'),
-      h('p', { class: 'muted', style: 'font-size:.9rem' }, '출석·보충·결석 기록도 함께 삭제되며 되돌릴 수 없습니다.'),
+      h('h3', {}, m.name + ' 부원을 명단에서 제외할까요?'),
+      h('p', { class: 'muted', style: 'font-size:.9rem' }, '출석 기록이 없는 부원만 명단에서 제외할 수 있습니다. 이전 시간표 기록은 보존됩니다.'),
       h('div', { class: 'actions' }, cancel, del));
   });
 }
@@ -531,15 +1272,18 @@ function graduateModal(m) {
     go.onclick = async () => {
       pending = true;
       cancel.disabled = true;
-      try { await busy(go, '처리 중...', () => api('api_graduate', m.id)); }
-      catch (e) { alert(errText(e)); }
+      let result;
+      try { result = await busy(go, '처리 중...', () => adminApi('api_graduate', m.id)); }
+      catch (e) { result = { ok: false, message: errText(e) }; }
       pending = false;
+      cancel.disabled = false;
+      if (!result.ok) { alert(result.message); return; }
       close();
       show('member');
     };
     box.append(
       h('h3', {}, m.name + ' 부원을 졸업 처리할까요?'),
-      h('p', { class: 'muted', style: 'font-size:.9rem' }, '조기졸업처럼 직접 처리할 때 씁니다. 출석 기록은 남고, 아래 졸업생 목록에서 되돌릴 수 있습니다.'),
+      h('p', { class: 'muted', style: 'font-size:.9rem' }, '졸업생 명단으로 이동합니다. 학년과 관계없이 같은 방식으로 처리되며, 출석 및 시간표 기록은 유지됩니다.'),
       h('div', { class: 'actions' }, cancel, go));
   });
 }
@@ -556,24 +1300,76 @@ function nameBlock(m, sub) {
 }
 
 async function renderMember() {
-  const all = await api('api_members');
+  const all = await adminApi('api_members');
   const members = all.filter((m) => m.type === 1);
-  const alumni = all.filter((m) => m.type !== 1);
+  const alumni = all.filter((m) => m.type === 0);
+  const archived = all.filter((m) => m.type === -1);
+
+  const search = h('input', { type: 'search', class: 'field',
+    placeholder: '부원 이름 검색', 'aria-label': '부원 이름 검색' });
+  const searchCount = h('p', { class: 'muted', role: 'status', 'aria-live': 'polite', style: 'font-size:.875rem' });
+  const emptySearch = h('p', { class: 'search-empty', role: 'status' }, '검색 결과가 없습니다. 이름을 다시 확인해 주세요.');
+  emptySearch.hidden = true;
+  const overview = h('p', { class: 'muted', style: 'margin:.5rem 0 1rem' },
+    '재학생 ' + members.length + '명 · ' +
+    [1, 2, 3].map(g => g + '학년 ' + members.filter(m => m.grade === g).length + '명').join(' · '));
+
+  // 현재 당번을 한눈에 확인하는 5일 × 3시간대 시간표. 이름을 누르면 기존 수정 창을 연다.
+  const scheduleShifts = [1, 3, 2];
+  const scheduleTable = h('table', { class: 'schedule-table', 'aria-label': '도서부 주간 당번 시간표' },
+    h('thead', {}, h('tr', {},
+      h('th', { scope: 'col' }, '시간'),
+      DAYS.map(day => h('th', { scope: 'col' }, day + '요일')))),
+    h('tbody', {}, scheduleShifts.map(shift =>
+      h('tr', {},
+        h('th', { scope: 'row' },
+          h('span', {}, SHIFT[shift]),
+          h('small', { class: 'schedule-time' }, TIME[shift])),
+        DAYS.map((day, index) => {
+          const assigned = members.filter(m => m.day === index + 1 && m.shift === shift);
+          return h('td', { class: 'schedule-cell' },
+            assigned.length ? assigned.map(m => h('button', {
+              type: 'button', class: 'schedule-person',
+              'aria-label': m.name + ' · ' + day + '요일 ' + SHIFT[shift] + ' 당번 수정',
+              onclick: () => memberModal(m)
+            }, m.name, h('small', {}, m.grade + '학년')))
+            : h('span', { class: 'schedule-empty' }, '—'));
+        })))));
+  const scheduleSection = h('section', { class: 'schedule-section', 'aria-labelledby': 'schedule-heading' },
+    h('div', { class: 'between schedule-heading' },
+      h('div', {},
+        h('h2', { id: 'schedule-heading', class: 'sub' }, '주간 당번 시간표'),
+        h('p', { class: 'muted' }, '이름을 누르면 요일과 당번 시간을 바로 수정할 수 있습니다.')),
+      h('button', { type: 'button', class: 'btn ghost sm',
+        onclick: async () => {
+          try { await schoolRulesModal(); } catch (e) { alert(errText(e)); }
+        } }, '시험·휴업일 설정')),
+    h('div', { class: 'schedule-scroll', tabindex: '0', role: 'region',
+      'aria-label': '주간 당번 시간표, 가로 스크롤 가능' }, scheduleTable));
+  const scheduleToggle = h('button', { type: 'button', class: 'btn ghost sm',
+    'aria-expanded': 'true', 'aria-controls': 'schedule-board' }, '시간표 접기');
+  scheduleSection.id = 'schedule-board';
+  scheduleToggle.addEventListener('click', () => {
+    const visible = !scheduleSection.hidden;
+    scheduleSection.hidden = visible;
+    scheduleToggle.setAttribute('aria-expanded', String(!visible));
+    scheduleToggle.textContent = visible ? '시간표 펼치기' : '시간표 접기';
+  });
 
   const list = members.length === 0
-    ? h('div', { class: 'card big' }, h('p', { class: 'bold' }, '등록된 부원이 없어요'), h('p', { class: 'muted', style: 'font-size:.9rem' }, '오른쪽 위 “부원 추가”로 시작해 보세요.'))
-    : h('ul', { class: 'col', style: 'gap:.5rem' }, members.map((m) =>
+    ? h('div', { class: 'card big' }, h('p', { class: 'bold' }, '등록된 부원이 없습니다.'), h('p', { class: 'muted', style: 'font-size:.9rem' }, '오른쪽 위 “부원 추가”로 시작해 보세요.'))
+    : h('ul', { class: 'member-roster' }, members.map((m) =>
         h('li', { class: 'card member' },
           nameBlock(m, DAYS[m.day - 1] + '요일 · ' + SHIFT[m.shift]),
           statsList(m),
           h('div', { class: 'row' },
             h('button', { type: 'button', class: 'btn ghost sm', onclick: () => memberModal(m) }, '수정'),
             h('button', { type: 'button', class: 'btn ghost sm', onclick: () => graduateModal(m) }, '졸업'),
-            h('button', { type: 'button', class: 'btn danger sm', onclick: () => deleteModal(m) }, '삭제')))));
+            h('button', { type: 'button', class: 'btn danger sm', onclick: () => deleteModal(m) }, '명단 제외')))));
 
   const restore = async (btn, m) => {
     let r;
-    try { r = await busy(btn, '처리 중...', () => api('api_restore', m.id)); }
+    try { r = await busy(btn, '처리 중...', () => adminApi('api_restore', m.id)); }
     catch (e) { r = { ok: false, message: errText(e) }; }
     if (r.ok) show('member'); else alert(r.message);
   };
@@ -585,13 +1381,46 @@ async function renderMember() {
       return h('li', { class: 'card member' },
         nameBlock(m, '졸업'),
         statsList(m),
-        h('div', { class: 'row' }, back, h('button', { type: 'button', class: 'btn danger sm', onclick: () => deleteModal(m) }, '삭제')));
+        h('div', { class: 'row' }, back, h('button', { type: 'button', class: 'btn danger sm', onclick: () => deleteModal(m) }, '명단 제외')));
     })));
 
+  const archivedList = archived.length > 0 && h('details', { class: 'mt8' },
+    h('summary', { class: 'bold', style: 'cursor:pointer;padding:.5rem 0' },
+      '명단에서 제외된 부원 (' + archived.length + '명)'),
+    h('p', { class: 'muted mt2' }, '실수로 제외한 부원은 여기서 복귀시킬 수 있습니다. 이전 시간표 기록은 유지됩니다.'),
+    h('ul', { class: 'col mt3' }, archived.map((m) => {
+      const button = h('button', { type: 'button', class: 'btn ghost sm' }, '명단에 복귀');
+      button.onclick = () => restore(button, m);
+      return h('li', { class: 'card member' },
+        nameBlock(m, '명단 제외'), h('div', { class: 'row' }, button));
+    })));
+  search.addEventListener('input', () => {
+    const query = search.value.trim().toLocaleLowerCase('ko-KR');
+    let visible = 0;
+    Array.from(list.children).forEach((item, i) => {
+      const member = members[i];
+      const matches = !!member && member.name.toLocaleLowerCase('ko-KR').includes(query);
+      item.style.display = matches ? '' : 'none';
+      if (matches) visible++;
+    });
+    searchCount.textContent = query ? '검색 결과 ' + visible + '명' : '';
+    emptySearch.hidden = !query || visible !== 0 || !members.length;
+  });
+
   return h('div', { class: 'stack' },
-    h('div', { class: 'between', style: 'margin-bottom:1rem' }, h('h1', { class: 'title', style: 'margin:0' }, '부원 관리'), h('button', { type: 'button', class: 'btn primary', onclick: () => memberModal() }, '+ 부원 추가')),
+    h('div', { class: 'between', style: 'margin-bottom:1rem' }, h('h1', { class: 'title', style: 'margin:0' }, '부원 관리'), h('div', { class: 'row wrap' }, logoutControl(),
+      scheduleToggle,
+      h('button', { type: 'button', class: 'btn ghost sm', onclick: inspectRoster }, '이력 점검'),
+      h('button', { type: 'button', class: 'btn ghost sm', onclick: openPromotion }, '학년도 정리'),
+      h('button', { type: 'button', class: 'btn primary', onclick: () => memberModal() }, '+ 부원 추가'))),
+    overview,
+    scheduleSection,
+    search,
+    searchCount,
     list,
-    graduates);
+    emptySearch,
+    graduates,
+    archivedList);
 }
 
 show('home');

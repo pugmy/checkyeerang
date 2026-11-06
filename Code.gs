@@ -1,5 +1,5 @@
 // 도서부 출석체크: 화면(Index.html) + 서버 로직 + 구글 시트 DB를 모두 Apps Script에서 돌린다.
-// 처음 한 번 setup()을 실행하면 시트 파일(User, choolsuck 탭)과 결석 자동 기록 트리거가 만들어진다.
+// 처음 한 번 setup_()을 실행하면 시트 파일(User, choolsuck 탭)과 결석 자동 기록 트리거가 만들어진다.
 
 var TZ = 'Asia/Seoul';
 // shift 값: 1 점심 전, 2 저녁, 3 점심 후 (기존 데이터의 1/2를 그대로 쓰려고 점심 후를 3으로 추가했다)
@@ -11,10 +11,14 @@ var DEADLINE_MINUTE = { 1: 13 * 60, 3: 13 * 60 + 20, 2: 18 * 60 + 20 };
 var SHIFT_ORDER = { 1: 1, 3: 2, 2: 3 }; // 목록 정렬용: 점심 전, 점심 후, 저녁
 
 var SCHEMA = {
-  User: ['id', 'name', 'grade', 'day', 'shift', 'workCount', 'addCount', 'runCount', 'createdAt', 'updatedAt', 'type'], // type: 0 졸업생, 1 재학생
+  User: ['id', 'name', 'grade', 'day', 'shift', 'workCount', 'addCount', 'runCount', 'createdAt', 'updatedAt', 'type'], // type: -1 명단 제외, 0 졸업생, 1 재학생
   choolsuck: ['id', 'userId', 'day', 'shift', 'kind', 'date', 'detail', 'createdAt', 'updatedAt'],
+  RosterHistory: ['id', 'userId', 'effectiveAt', 'patch', 'createdAt'],
+  CalendarNotes: ['id', 'date', 'category', 'title', 'detail', 'userId', 'createdAt', 'updatedAt'],
+  SchoolDays: ['id', 'startDate', 'endDate', 'category', 'title', 'supersedesId', 'cancelled', 'createdAt', 'updatedAt'],
+  AttendanceCorrections: ['id', 'absenceId', 'userId', 'date', 'shift', 'reason', 'createdAt', 'updatedAt'],
 };
-var TEXT_COLS = ['name', 'kind', 'date', 'detail', 'createdAt', 'updatedAt'];
+var TEXT_COLS = ['name', 'kind', 'date', 'detail', 'createdAt', 'updatedAt', 'effectiveAt', 'patch', 'category', 'title', 'startDate', 'endDate', 'reason'];
 
 // ---------- 진입점 / 설치 ----------
 
@@ -26,7 +30,7 @@ function doGet() {
 }
 
 // 시트 파일이 없으면 만들고, 탭/헤더를 맞추고, 결석 자동 기록 트리거(5분마다)를 건다. 여러 번 실행해도 된다.
-function setup() {
+function setup_() {
   var props = PropertiesService.getScriptProperties();
   var id = props.getProperty('SHEET_ID');
   var ss = id ? SpreadsheetApp.openById(id) : SpreadsheetApp.create('도서부 출석체크 DB');
@@ -44,10 +48,13 @@ function setup() {
   });
   if (!id && SCHEMA[fresh.getName()] === undefined && ss.getSheets().length > 1) ss.deleteSheet(fresh);
 
+  // 기존 부원 상태를 한 번 봉인한다. 이전 시점은 검증된 이력으로 간주하지 않는다.
+  rosterBaseline_();
+
   ScriptApp.getProjectTriggers().forEach(function (t) {
-    if (t.getHandlerFunction() === 'recordAbsencesToday') ScriptApp.deleteTrigger(t);
+    if (t.getHandlerFunction() === 'recordAbsencesToday_' || t.getHandlerFunction() === 'recordAbsencesToday') ScriptApp.deleteTrigger(t);
   });
-  ScriptApp.newTrigger('recordAbsencesToday').timeBased().everyMinutes(5).create();
+  ScriptApp.newTrigger('recordAbsencesToday_').timeBased().everyMinutes(5).create();
 
   Logger.log('DB 시트: ' + ss.getUrl());
 }
@@ -182,8 +189,7 @@ function result_(ok, message) {
 
 // 오늘 마감이 지난 당번 중 출석하지 않은 부원을 결석(absent)으로 기록하고 runCount를 1 올린다.
 // 같은 (부원, 날짜, 당번, 종류)는 insert_의 unique 검사로 한 번만 들어가므로 여러 번 불러도 된다.
-function recordAbsencesToday() {
-  promoteYearly();
+function recordAbsencesToday_() {
   var now = new Date();
   var date = today_(now);
   var range = parseDate_(date);
@@ -197,26 +203,32 @@ function recordAbsencesToday() {
   // 학사일정을 못 읽으면 면제 여부를 모르므로 잘못된 결석을 남기지 않게 이번에는 건너뛴다(다음 실행에서 다시 시도)
   var exempt;
   try {
-    exempt = exemption_(date);
+    exempt = schoolExemption_(date);
   } catch (e) {
     Logger.log('학사일정 조회 실패로 결석 기록을 건너뜁니다: ' + e.message);
     return;
   }
 
   locked_(function () {
-    var users = read_('User').filter(function (u) { return u.type === 1; });
+    if (schoolRuleEffective_(date).all) return;
+    var users = read_('User');
+    var byId = {};
+    users.forEach(function (u) { byId[u.id] = u; });
+    var history = rosterIndex_();
     var records = read_('choolsuck').filter(function (r) { return r.date === date; });
     due.forEach(function (shift) {
       var deadline = new Date(range.start.getTime() + DEADLINE_MINUTE[shift] * 60 * 1000);
-      users
+      // 마감 시점의 시간표로 판단한다. 이후 수정된 배정으로 과거 결석을 만들지 않는다.
+      rosterHistoryFor_(users, history, rosterAtDeadline_(date, shift))
         .filter(function (u) {
           return (
+            u.type === 1 &&
             u.day === range.day &&
             u.shift === shift &&
             !isExempt_(exempt, u.grade) &&
-            u.createdAt < range.start.toISOString() && // 오늘 이전에 등록된 부원만
+            byId[u.id].createdAt < range.start.toISOString() && // 오늘 이전에 등록된 부원만
             !records.some(function (r) {
-              return r.userId === u.id && r.shift === shift && (r.kind === 'duty' || r.kind === 'absent');
+              return r.userId === u.id && r.shift === shift && (r.kind === 'duty' || r.kind === 'absent' || r.kind === 'excused');
             })
           );
         })
@@ -235,20 +247,30 @@ function recordAbsencesToday() {
 // ---------- 화면용 API (google.script.run으로 호출) ----------
 
 function api_home() {
-  recordAbsencesToday();
+  recordAbsencesToday_();
   var date = today_();
   var current = currentShift_();
   var users = read_('User').filter(function (u) { return u.type === 1; });
-
-  var duty = [];
-  if (current) {
-    var attended = {};
-    read_('choolsuck').forEach(function (r) {
-      if (r.date === date && r.kind === 'duty') attended[r.userId] = true;
-    });
-    duty = users
-      .filter(function (u) { return u.day === current.day && u.shift === current.shift; })
-      .map(function (u) { return { id: u.id, name: u.name, attended: !!attended[u.id] }; });
+  var attendance = {};
+  read_('choolsuck').forEach(function (r) {
+    if (r.date === date && r.kind === 'duty') attendance[r.userId] = true;
+  });
+  var weekday = parseDate_(date).day;
+  var allUsers = read_('User');
+  var rosterHistory = rosterIndex_();
+  var slots = [LUNCH, LUNCH_AFTER, DINNER].map(function (shift) {
+    var candidates = rosterHistoryFor_(allUsers, rosterHistory, rosterAtDeadline_(date, shift))
+      .filter(function (u) { return u.type === 1 && u.day === weekday && u.shift === shift; });
+    return { shift: shift, duty: candidates.map(function (u) {
+      return { id: u.id, name: u.name, attended: !!attendance[u.id] };
+    }) };
+  });
+  var duty = current ? slots.filter(function (slot) { return slot.shift === current.shift; })[0].duty : [];
+  var exemption = { all: false, reasons: [], unknown: false };
+  try {
+    exemption = schoolExemption_(date);
+  } catch (e) {
+    exemption.unknown = true;
   }
 
   var makeup = users.slice().sort(byName_).map(function (u) {
@@ -259,7 +281,7 @@ function api_home() {
       onDuty: !!current && u.day === current.day && u.shift === current.shift,
     };
   });
-  return { today: date, current: current, duty: duty, makeup: makeup };
+  return { today: date, current: current, duty: duty, slots: slots, exemption: exemption, makeup: makeup };
 }
 
 function api_attend(userId, detail) {
@@ -268,8 +290,14 @@ function api_attend(userId, detail) {
   // 클라이언트 값은 믿지 않고, 서버에서 현재 당번 시간대와 해당 부원인지 다시 검증
   var current = currentShift_();
   if (!current) return result_(false, '지금은 당번 시간이 아닙니다.');
+  var day = today_();
+  var ex;
+  try { ex = schoolExemption_(day); }
+  catch (e) { ex = schoolRuleEffective_(day); }
+  if (ex.all) return result_(false, '오늘은 출석 의무가 없는 기간입니다.');
 
   return locked_(function () {
+    if (schoolRuleEffective_(today_()).all) return result_(false, '오늘은 출석 의무가 없는 기간입니다.');
     var member = read_('User').filter(function (u) {
       return u.type === 1 && u.id === userId && u.day === current.day && u.shift === current.shift;
     })[0];
@@ -277,7 +305,7 @@ function api_attend(userId, detail) {
 
     var date = today_();
     var already = read_('choolsuck').some(function (r) {
-      return r.userId === member.id && r.date === date && r.shift === current.shift && (r.kind === 'duty' || r.kind === 'absent');
+      return r.userId === member.id && r.date === date && r.shift === current.shift && (r.kind === 'duty' || r.kind === 'absent' || r.kind === 'excused');
     });
     if (already) return result_(false, '오늘은 이미 출석했습니다.');
 
@@ -299,8 +327,17 @@ function api_makeup(userId, detail) {
   var date = today_();
   var today = parseDate_(date);
   if (!today.day) return result_(false, '주말에는 보충할 수 없습니다.');
+  var school;
+  try { school = schoolExemption_(date); }
+  catch (e) { school = schoolRuleEffective_(date); }
+  if ((school.reasons || []).some(function (r) { return r.category === 'closed'; })) {
+    return result_(false, '휴업일에는 보충 출석을 기록할 수 없습니다.');
+  }
 
   return locked_(function () {
+    if (schoolRuleEffective_(date).reasons.some(function (r) { return r.category === 'closed'; })) {
+      return result_(false, '휴업일에는 보충 출석을 기록할 수 없습니다.');
+    }
     var member = read_('User').filter(function (u) { return u.type === 1 && u.id === userId; })[0];
     if (!member) return result_(false, '부원을 선택하세요.');
 
@@ -320,30 +357,34 @@ function api_makeup(userId, detail) {
   });
 }
 
-function api_admin(date) {
+function api_admin(date, token) {
+  requireAdmin_(token);
   var today = today_();
   var range = parseDate_(date);
   if (!range) {
     date = today;
     range = parseDate_(date);
   }
-  if (date === today) recordAbsencesToday();
-  if (!range.day) return { today: today, date: date, day: 0, users: [], records: [], exempt: null };
+  if (date === today) recordAbsencesToday_();
+  if (!range.day) return { today: today, date: date, day: 0, users: [], rosterByShift: {}, rosterVerified: true, records: [], exempt: null };
 
   var records = read_('choolsuck')
     .filter(function (r) { return r.date === date; })
     .sort(function (a, b) { return a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0; });
   var exempt = null;
   try {
-    exempt = exemption_(date);
+    exempt = schoolExemption_(date);
   } catch (e) {} // 학사일정을 못 읽어도 출석 화면은 보여 준다(면제 표시만 빠진다)
-  var users = read_('User').filter(function (u) {
-    return u.type === 1 || records.some(function (r) { return r.userId === u.id; });
-  });
-  return { today: today, date: date, day: range.day, users: users.sort(byName_), records: records, exempt: exempt };
+  var view = rosterDayView_(date, read_('User'), records);
+  return {
+    today: today, date: date, day: range.day,
+    users: view.users, rosterByShift: view.shifts,
+    rosterVerified: view.verified, records: records, exempt: exempt,
+  };
 }
 
-function api_members() {
+function api_members(token) {
+  requireAdmin_(token);
   return read_('User').sort(function (a, b) {
     return a.day - b.day || SHIFT_ORDER[a.shift] - SHIFT_ORDER[b.shift] || byName_(a, b);
   });
@@ -358,23 +399,31 @@ function validateMember_(d) {
   return null;
 }
 
-function api_addMember(d) {
+function api_addMember(d, token) {
+  requireAdmin_(token);
   var error = validateMember_(d);
   if (error) return result_(false, error);
   return locked_(function () {
+    rosterRequireBaseline_();
+    rosterAssertConsistent_();
     var row = insert_(
       'User',
       { name: String(d.name).trim(), grade: Number(d.grade), day: Number(d.day), shift: Number(d.shift), workCount: 0, addCount: 0, runCount: 0, type: 1 },
       ['name', 'type']
     );
+    if (row) rosterSaveEventOrRollback_(null, row);
     return row ? result_(true, '추가되었습니다.') : result_(false, '이미 같은 이름의 부원이 있습니다.');
   });
 }
 
-function api_updateMember(id, d) {
+function api_updateMember(id, d, token) {
+  requireAdmin_(token);
   var error = validateMember_(d);
   if (error) return result_(false, error);
   return locked_(function () {
+    rosterRequireBaseline_();
+    rosterAssertConsistent_();
+    var before = read_('User').filter(function (u) { return u.id === Number(id); })[0];
     var r = update_(
       'User',
       Number(id),
@@ -384,23 +433,35 @@ function api_updateMember(id, d) {
     );
     if (r === 'DUP') return result_(false, '이미 같은 이름의 부원이 있습니다.');
     if (r === 'NOTFOUND') return result_(false, '존재하지 않는 부원입니다.');
+    rosterSaveEventOrRollback_(before, r);
     return result_(true, '수정되었습니다.');
   });
 }
 
 // 조기졸업처럼 사람이 직접 졸업 처리한다. 기록은 남는다.
-function api_graduate(id) {
+function api_graduate(id, token) {
+  requireAdmin_(token);
   return locked_(function () {
+    rosterRequireBaseline_();
+    rosterAssertConsistent_();
+    var before = read_('User').filter(function (u) { return u.id === Number(id); })[0];
     var r = update_('User', Number(id), { type: 0 });
-    return r === 'NOTFOUND' ? result_(false, '존재하지 않는 부원입니다.') : result_(true, '졸업 처리되었습니다.');
+    if (r === 'NOTFOUND') return result_(false, '존재하지 않는 부원입니다.');
+    rosterSaveEventOrRollback_(before, r);
+    return result_(true, '졸업 처리되었습니다.');
   });
 }
 
-function api_restore(id) {
+function api_restore(id, token) {
+  requireAdmin_(token);
   return locked_(function () {
+    rosterRequireBaseline_();
+    rosterAssertConsistent_();
+    var before = read_('User').filter(function (u) { return u.id === Number(id); })[0];
     var r = update_('User', Number(id), { type: 1 }, null, ['name', 'type']);
     if (r === 'DUP') return result_(false, '같은 이름의 재학생이 있어 복귀할 수 없습니다.');
     if (r === 'NOTFOUND') return result_(false, '존재하지 않는 부원입니다.');
+    rosterSaveEventOrRollback_(before, r);
     return result_(true, '재학생으로 복귀했습니다.');
   });
 }
@@ -418,29 +479,136 @@ function promote_(users, cutoffISO, nowISO) {
   return changed;
 }
 
-// 3월(1~31일)에 올해 진급을 아직 안 했으면 한 번만 실행한다. 5분 트리거와 화면 접속 때 확인한다.
-function promoteYearly() {
-  var date = today_();
-  var year = Number(date.slice(0, 4));
-  if (date < year + '-03-01' || date > year + '-03-31') return;
-  var props = PropertiesService.getScriptProperties();
-  var done = function () { return Number(props.getProperty('PROMOTED_YEAR')) >= year; };
-  if (done()) return;
-  locked_(function () {
-    if (done()) return; // 락을 기다리는 사이 다른 실행이 끝냈을 수 있다
-    var users = read_('User');
-    promote_(users, parseDate_(year + '-03-01').start.toISOString(), new Date().toISOString());
-    writeAll_('User', users);
-    props.setProperty('PROMOTED_YEAR', String(year));
+// 진급은 관리자 확인 후에만 실행한다. 출석/결석 트리거는 학년을 바꾸지 않는다.
+function promotionPlan_(users, year) {
+  var cutoff = parseDate_(year + '-03-01').start.toISOString();
+  return users.filter(function (u) {
+    return u.type === 1 && u.createdAt < cutoff;
+  }).map(function (u) {
+    return { id: u.id, name: u.name, fromGrade: u.grade,
+      toGrade: u.grade >= 3 ? null : u.grade + 1,
+      action: u.grade >= 3 ? 'graduate' : 'promote' };
   });
 }
 
-// 출석/보충/결석 기록이 부원을 참조하므로 함께 지운다
-function api_deleteMember(id) {
+function promotionYear_() {
+  var today = today_();
+  var year = Number(today.slice(0, 4));
+  // 새 학년도 시작 전에는 실행 불가; 이후에는 학기 중 늦게라도 직접 처리 가능.
+  return today >= year + '-03-01' ? year : null;
+}
+
+function api_promotionPreview(token) {
+  requireAdmin_(token);
+  var year = promotionYear_();
+  if (!year) return { ok: false, message: '3월 1일부터 새 학년도 진급을 처리할 수 있습니다.' };
+  var props = PropertiesService.getScriptProperties();
+  var done = Number(props.getProperty('PROMOTED_YEAR')) >= year;
+  var reviewRequired = !done && !!props.getProperty('PROMOTION_PENDING_YEAR');
+  var plan = done || reviewRequired ? [] : promotionPlan_(read_('User'), year);
+  return { ok: true, year: year, done: done, reviewRequired: reviewRequired, members: plan,
+    promotions: plan.filter(function (u) { return u.action === 'promote'; }).length,
+    graduates: plan.filter(function (u) { return u.action === 'graduate'; }).length };
+}
+
+function api_applyPromotion(year, expectedIds, decisions, token) {
+  // 기존 클라이언트의 3인자 호출을 유지한다.
+  if (token === undefined && typeof decisions === 'string') {
+    token = decisions;
+    decisions = null;
+  }
+  requireAdmin_(token);
+  year = Number(year);
+  if (!Number.isSafeInteger(year) || promotionYear_() !== year) {
+    return result_(false, '진급 대상 학년도를 다시 확인하세요.');
+  }
+  if (!Array.isArray(expectedIds) || expectedIds.length > 500 ||
+      expectedIds.some(function (id) { return typeof id !== 'string' || !/^[1-9]\d*:[123]$/.test(id); })) {
+    return result_(false, '진급 대상 명단이 올바르지 않습니다.');
+  }
+  // 변경 대상은 미리보기 명단 안으로 제한한다. 같은 학생을 두 번 지정할 수 없다.
+  if (decisions != null && (!Array.isArray(decisions) || decisions.length > 500 ||
+      decisions.some(function (item) {
+        return !item || !Number.isSafeInteger(item.id) || item.id <= 0 ||
+          ['promote', 'graduate', 'exclude', 'keep'].indexOf(item.action) < 0;
+      }) ||
+      new Set(decisions.map(function (item) { return item.id; })).size !== decisions.length)) {
+    return result_(false, '학생별 처리 항목을 다시 확인하세요.');
+  }
   return locked_(function () {
-    delete_('choolsuck', 'userId', Number(id));
-    delete_('User', 'id', Number(id));
-    return result_(true, '삭제되었습니다.');
+    var props = PropertiesService.getScriptProperties();
+    if (Number(props.getProperty('PROMOTED_YEAR')) >= year) {
+      return result_(false, '이번 학년도 진급은 이미 처리되었습니다.');
+    }
+    if (props.getProperty('PROMOTION_PENDING_YEAR')) {
+      return result_(false, '이전 진급 처리 결과를 확인해야 합니다. 이력 점검 후 담당자가 상태를 확인하세요.');
+    }
+    rosterRequireBaseline_();
+    rosterAssertConsistent_();
+    var users = read_('User');
+    var plan = promotionPlan_(users, year);
+    var actual = plan.map(function (x) { return x.id + ':' + x.fromGrade; }).sort();
+    var expected = expectedIds.slice().sort();
+    if (actual.length !== expected.length ||
+        actual.some(function (id,i) {return id !== expected[i];})) {
+      return result_(false, '진급 대상 명단이 변경되었습니다. 미리보기를 다시 확인하세요.');
+    }
+    if (!plan.length) return result_(false, '진급할 재학생이 없습니다.');
+    var previous = users.map(function (u) { return Object.assign({}, u); });
+    var stamp = new Date().toISOString();
+    var allowed = {};
+    plan.forEach(function (m) { allowed[m.id] = m; });
+    var overrides = {};
+    (decisions || []).forEach(function (item) { overrides[item.id] = item.action; });
+    if (Object.keys(overrides).some(function (id) { return !allowed[id]; })) {
+      return result_(false, '진급 대상이 아닌 학생이 포함되어 있습니다. 명단을 다시 불러오세요.');
+    }
+    var invalid = plan.some(function (m) {
+      var action = overrides[m.id] || m.action;
+      return (action === 'promote' && m.fromGrade >= 3);
+    });
+    if (invalid) return result_(false, '3학년은 4학년으로 진급할 수 없습니다. 처리 항목을 다시 선택하세요.');
+    var byId = {};
+    users.forEach(function (u) { byId[u.id] = u; });
+    plan.forEach(function (m) {
+      var u = byId[m.id];
+      var action = overrides[m.id] || m.action;
+      if (action === 'promote') u.grade += 1;
+      else if (action === 'graduate') u.type = 0;
+      else if (action === 'exclude') u.type = -1;
+      if (action !== 'keep') u.updatedAt = stamp;
+    });
+    var changes = users.map(function (u,i) {
+      return { userId: u.id, patch: rosterPatch_(previous[i], u) };
+    }).filter(function (x) { return Object.keys(x.patch).length > 0; });
+    // 완료 표식 저장에 실패해도 다시 진급되지 않도록, 변경 전에 시작 표식을 남긴다.
+    props.setProperty('PROMOTION_PENDING_YEAR', String(year));
+    rosterPromoteOrRollback_(previous, users, changes, stamp);
+    props.setProperty('PROMOTED_YEAR', String(year));
+    props.deleteProperty('PROMOTION_PENDING_YEAR');
+    return result_(true, year + '학년도 명단 정리가 완료되었습니다.');
+  });
+}
+
+// 출석 이력이 있는 부원은 삭제하지 않는다. 졸업 처리로 기록을 보존한다.
+function api_deleteMember(id, token) {
+  requireAdmin_(token);
+  rosterRequireBaseline_();
+  rosterAssertConsistent_();
+  id = Number(id);
+  if (!Number.isSafeInteger(id) || id <= 0) return result_(false, '올바른 부원을 선택하세요.');
+  return locked_(function () {
+    var member = read_('User').filter(function (u) { return u.id === id && u.type !== -1; })[0];
+    if (!member) return result_(false, '존재하지 않는 부원입니다.');
+    // 부원 행을 실제로 삭제하지 않아야 과거 배정과 감사 이력을 복원할 수 있다.
+    var hasHistory = read_('choolsuck').some(function (r) { return r.userId === id; });
+    if (hasHistory) {
+      return result_(false, '출석 기록이 있는 부원은 삭제할 수 없습니다. 졸업 처리로 기록을 보존하세요.');
+    }
+    var updated = update_('User', id, { type: -1 });
+    if (updated === 'NOTFOUND') return result_(false, '존재하지 않는 부원입니다.');
+    rosterSaveEventOrRollback_(member, updated);
+    return result_(true, '부원 목록에서 제외되었습니다.');
   });
 }
 
@@ -463,29 +631,34 @@ function formatKST_(d) {
   return Utilities.formatDate(d, TZ, 'yyyy. M. d') + ' ' + (h < 12 ? '오전' : '오후') + ' ' + (h % 12 || 12) + Utilities.formatDate(d, TZ, ':mm:ss');
 }
 
-function api_csv(from, to) {
+function api_csv(from, to, token) {
+  requireAdmin_(token);
   var f = parseDate_(from);
   var t = parseDate_(to);
   if (!f || !t) return { ok: false, message: '시작일과 종료일을 올바르게 입력하세요.' };
   if (t.start < f.start) return { ok: false, message: '종료일이 시작일보다 빠릅니다.' };
 
-  var start = f.start.toISOString();
-  var end = t.end.toISOString();
   var users = {};
   read_('User').forEach(function (u) { users[u.id] = u; });
+  var rosterIndex = rosterIndex_();
+  // 출석일 기준으로 조회한다. 저장 시각(createdAt)은 일시 표시용이다.
   var records = read_('choolsuck')
-    .filter(function (r) { return r.createdAt >= start && r.createdAt < end && users[r.userId]; })
+    .filter(function (r) {
+      return r.date >= from && r.date <= to &&
+        (r.kind === 'duty' || r.kind === 'makeup') && !!users[r.userId];
+    })
     .sort(function (a, b) { return a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : a.id - b.id; });
 
-  var lines = [['요일', '일시', '시간', '이름', '학년', '구분', '담당 요일', '담당 시간', '특이사항'].map(cell_).join(',')];
+  var lines = [['요일', '일시', '시간', '이름', '학년', '구분', '담당 요일', '담당 시간', '특이사항', '시간표 이력'].map(cell_).join(',')];
   records.forEach(function (r) {
-    var u = users[r.userId];
+    var snapshot = rosterForRecord_(rosterIndex, r, users[r.userId]);
+    var u = snapshot.user;
     var at = new Date(r.createdAt);
     var h = Number(Utilities.formatDate(at, TZ, 'H'));
     var recorded = h >= 12 && h < 14 ? '점심' : h >= 17 && h < 19 ? '저녁' : ''; // 기록된 시각 기준
     lines.push(
       [
-        DAY_NAME[Number(Utilities.formatDate(at, TZ, 'u')) % 7],
+        DAY_NAME[r.day] || '', // 등록 시각이 아닌 실제 출석 날짜의 요일
         formatKST_(at),
         recorded,
         u.name,
@@ -494,6 +667,7 @@ function api_csv(from, to) {
         DAY_NAME[u.day],
         SHIFT_LABEL[r.kind === 'makeup' ? u.shift : r.shift] || '', // 보충 기록의 shift는 0이라 부원의 당번 시간을 쓴다
         r.detail,
+        snapshot.verified ? '확인됨' : '이력 시작 전·미확인',
       ].map(cell_).join(',')
     );
   });
@@ -501,7 +675,7 @@ function api_csv(from, to) {
 }
 
 // ---------- NEIS 학사일정 ----------
-// 스크립트 속성: NEIS_KEY(필수). ATPT_CODE, SCHUL_CODE는 findSchool()을 한 번 실행하면 자동으로 저장된다.
+// 스크립트 속성: NEIS_KEY(필수). ATPT_CODE, SCHUL_CODE는 findSchool_()을 한 번 실행하면 자동으로 저장된다.
 
 var SCHOOL_NAME = '창원과학고등학교';
 
@@ -534,7 +708,7 @@ function neisRows_(data, service) {
 }
 
 // 에디터에서 한 번 실행: 학교 코드를 찾아 스크립트 속성(ATPT_CODE, SCHUL_CODE)에 저장한다
-function findSchool() {
+function findSchool_() {
   var r = neisRows_(neis_('schoolInfo', { SCHUL_NM: SCHOOL_NAME }), 'schoolInfo');
   Logger.log(JSON.stringify(r.rows.map(function (s) { return [s.SCHUL_NM, s.ATPT_OFCDC_SC_CODE, s.SD_SCHUL_CODE, s.ORG_RDNMA]; })));
   if (r.rows.length !== 1) throw new Error('학교가 ' + r.rows.length + '개 검색되었습니다. 로그를 보고 속성을 직접 넣으세요.');
@@ -545,7 +719,7 @@ function findSchool() {
 
 function schoolParams_() {
   var props = PropertiesService.getScriptProperties();
-  if (!props.getProperty('SCHUL_CODE')) throw new Error('findSchool()을 먼저 실행하세요.');
+  if (!props.getProperty('SCHUL_CODE')) throw new Error('findSchool_()을 먼저 실행하세요.');
   return { ATPT_OFCDC_SC_CODE: props.getProperty('ATPT_CODE'), SD_SCHUL_CODE: props.getProperty('SCHUL_CODE') };
 }
 
@@ -561,12 +735,21 @@ var GRADE_FLAG = { 1: 'ONE_GRADE_EVENT_YN', 2: 'TW_GRADE_EVENT_YN', 3: 'THREE_GR
 // rows: date부터 date+14일까지의 NEIS 학사일정 행. 반환: {all, grades: {1,2,3}}
 function exemptFrom_(rows, date) {
   var ymd = date.replace(/-/g, '');
-  var ex = { all: false, grades: { 1: false, 2: false, 3: false } };
+  var ex = { all: false, grades: { 1: false, 2: false, 3: false }, reasons: [] };
   rows.forEach(function (r) {
     // 오늘부터 14일 안에 시험일이 있으면 시험 2주 전이거나 시험 기간 중이다
-    if (String(r.EVENT_NM).indexOf(EXAM_WORD) >= 0) ex.all = true;
+    if (String(r.EVENT_NM).indexOf(EXAM_WORD) >= 0) {
+      ex.all = true;
+      if (!ex.reasons.some(function (reason) { return reason.category === 'exam'; })) {
+        ex.reasons.push({ category: 'exam', title: String(r.EVENT_NM), message: '시험 기간입니다' });
+      }
+    }
     if (r.AA_YMD !== ymd) return;
-    if (r.SBTR_DD_SC_NM === '휴업일' || r.SBTR_DD_SC_NM === '공휴일') ex.all = true;
+    if (r.SBTR_DD_SC_NM === '휴업일' || r.SBTR_DD_SC_NM === '공휴일') {
+      ex.all = true;
+      ex.reasons.push({ category: 'closed', title: String(r.EVENT_NM || r.SBTR_DD_SC_NM),
+        message: '오늘은 등교하지 않는 날입니다' });
+    }
     if (EXEMPT_EVENT_WORDS.some(function (w) { return String(r.EVENT_NM).indexOf(w) >= 0; })) {
       [1, 2, 3].forEach(function (g) { if (r[GRADE_FLAG[g]] === 'Y') ex.grades[g] = true; });
     }

@@ -1,3 +1,6 @@
 # 로컬 비밀값과 clasp 설정(스크립트 ID)
 .env*
 .clasp.json
+
+# 로컬 UI 미리보기 산출물 (테스트 데이터)
+preview-ui.html
