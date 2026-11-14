@@ -46,6 +46,18 @@ function requireAdmin_(token) {
   if (stored !== config.hash) throw new Error('관리자 로그인이 만료되었습니다. 다시 로그인하세요.');
 }
 
+// 편집기 실행 목록에는 '_'로 끝나는 비공개 함수가 보이지 않는다. 그래서 편집기에서 실행할 얇은 래퍼를 둔다.
+// 래퍼는 웹앱에서도 이름으로 호출할 수 있으므로, 스크립트 소유자가 편집기에서 실행한 경우만 통과시킨다.
+// (익명 방문자는 활성 사용자 이메일이 비어 있고, 배포자 계정은 항상 소유자다.)
+function ownerOnly_() {
+  var active = Session.getActiveUser().getEmail();
+  if (!active || active !== Session.getEffectiveUser().getEmail()) {
+    throw new Error('스크립트 소유자가 편집기에서만 실행할 수 있습니다.');
+  }
+}
+function runSetup() { ownerOnly_(); setup_(); }
+function runFindSchool() { ownerOnly_(); findSchool_(); }
+
 function api_adminLogout(token) {
   if (typeof token === 'string' && token.length === 72) {
     CacheService.getScriptCache().remove('admin:session:' + adminHash_(token));

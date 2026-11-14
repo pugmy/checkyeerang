@@ -15,10 +15,10 @@ var SCHEMA = {
   choolsuck: ['id', 'userId', 'day', 'shift', 'kind', 'date', 'detail', 'createdAt', 'updatedAt'],
   RosterHistory: ['id', 'userId', 'effectiveAt', 'patch', 'createdAt'],
   CalendarNotes: ['id', 'date', 'category', 'title', 'detail', 'userId', 'createdAt', 'updatedAt'],
-  SchoolDays: ['id', 'startDate', 'endDate', 'category', 'title', 'supersedesId', 'cancelled', 'createdAt', 'updatedAt'],
+  SchoolDays: ['id', 'startDate', 'endDate', 'category', 'title', 'supersedesId', 'cancelled', 'createdAt', 'updatedAt', 'grades', 'neisKey'],
   AttendanceCorrections: ['id', 'absenceId', 'userId', 'date', 'shift', 'reason', 'createdAt', 'updatedAt'],
 };
-var TEXT_COLS = ['name', 'kind', 'date', 'detail', 'createdAt', 'updatedAt', 'effectiveAt', 'patch', 'category', 'title', 'startDate', 'endDate', 'reason'];
+var TEXT_COLS = ['name', 'kind', 'date', 'detail', 'createdAt', 'updatedAt', 'effectiveAt', 'patch', 'category', 'title', 'startDate', 'endDate', 'reason', 'grades', 'neisKey'];
 
 // ---------- 진입점 / 설치 ----------
 
@@ -74,7 +74,7 @@ function read_(table) {
     var o = { _row: i + 2 };
     cols.forEach(function (c, j) {
       // type 열이 없던 시절의 행은 재학생으로 본다
-      o[c] = TEXT_COLS.indexOf(c) >= 0 ? String(v[j]) : c === 'type' && v[j] === '' ? 1 : Number(v[j]);
+      o[c] = TEXT_COLS.indexOf(c) >= 0 ? (v[j] == null ? '' : String(v[j])) : c === 'type' && v[j] === '' ? 1 : Number(v[j]);
     });
     return o;
   });
@@ -194,6 +194,9 @@ function recordAbsencesToday_() {
   var date = today_(now);
   var range = parseDate_(date);
   if (!range || !range.day) return;
+
+  // 휴업일을 놓치지 않게 결석 판단 전에 학사일정을 가져온다(하루 한 번). 실패해도 이미 저장된 일정으로 계속한다.
+  try { syncNeisSchedule_(false); } catch (e) { Logger.log('NEIS 일정 가져오기 실패: ' + e.message); }
 
   var due = [LUNCH, LUNCH_AFTER, DINNER].filter(function (shift) {
     return now >= new Date(range.start.getTime() + DEADLINE_MINUTE[shift] * 60 * 1000);
@@ -317,6 +320,30 @@ function api_attend(userId, detail) {
     if (!row) return result_(false, '오늘은 이미 출석했습니다.');
     update_('User', member.id, null, { workCount: 1 });
     return result_(true, '출석이 기록되었습니다.');
+  });
+}
+
+// 관리자가 결석으로 기록된 당번을 출석 처리한다. 원래 결석 기록은 별도 행(AttendanceCorrections)에 남긴다.
+function api_markPresent(absenceId, token) {
+  requireAdmin_(token);
+  absenceId = Number(absenceId);
+  if (!Number.isSafeInteger(absenceId) || absenceId <= 0) return result_(false, '처리할 결석 기록을 확인해 주세요.');
+  return locked_(function () {
+    var record = read_('choolsuck').filter(function (r) { return r.id === absenceId; })[0];
+    if (!record || record.kind !== 'absent') return result_(false, '처리할 결석 기록이 없습니다.');
+    var member = read_('User').filter(function (u) { return u.id === record.userId; })[0];
+    if (!member) return result_(false, '부원 정보를 찾을 수 없습니다.');
+    if (member.runCount < 1) return result_(false, '결석 횟수가 기록과 일치하지 않습니다. 원본 시트를 확인해 주세요.');
+    insert_('AttendanceCorrections', { absenceId: record.id, userId: record.userId,
+      date: record.date, shift: record.shift, reason: '관리자 출석 처리' });
+    var updated = update_('choolsuck', record.id, {
+      kind: 'duty', detail: ('관리자 출석 처리' + (record.detail ? ' / 기존 메모: ' + record.detail : '')).slice(0, 1000)
+    }, null, ['userId', 'date', 'shift', 'kind']);
+    if (updated === 'DUP') return result_(false, '이미 출석 기록이 있습니다.');
+    if (updated === 'NOTFOUND') throw new Error('처리 대상이 사라졌습니다. 감사 기록을 확인해 주세요.');
+    var count = update_('User', member.id, null, { runCount: -1, workCount: 1 });
+    if (count === 'NOTFOUND') throw new Error('출석 기록은 수정했지만 부원 횟수 갱신에 실패했습니다. 관리자 점검이 필요합니다.');
+    return result_(true, '출석으로 처리했습니다.');
   });
 }
 
@@ -719,7 +746,7 @@ function findSchool_() {
 
 function schoolParams_() {
   var props = PropertiesService.getScriptProperties();
-  if (!props.getProperty('SCHUL_CODE')) throw new Error('findSchool_()을 먼저 실행하세요.');
+  if (!props.getProperty('SCHUL_CODE')) throw new Error('편집기에서 runFindSchool을 먼저 실행하세요.');
   return { ATPT_OFCDC_SC_CODE: props.getProperty('ATPT_CODE'), SD_SCHUL_CODE: props.getProperty('SCHUL_CODE') };
 }
 
@@ -732,51 +759,98 @@ var EXAM_LEAD_DAYS = 14;
 var EXEMPT_EVENT_WORDS = ['해외체험학습', '졸업식', '종업식', '진로탐색활동', '이공계 대학탐방'];
 var GRADE_FLAG = { 1: 'ONE_GRADE_EVENT_YN', 2: 'TW_GRADE_EVENT_YN', 3: 'THREE_GRADE_EVENT_YN' };
 
-// rows: date부터 date+14일까지의 NEIS 학사일정 행. 반환: {all, grades: {1,2,3}}
-function exemptFrom_(rows, date) {
-  var ymd = date.replace(/-/g, '');
-  var ex = { all: false, grades: { 1: false, 2: false, 3: false }, reasons: [] };
-  rows.forEach(function (r) {
-    // 오늘부터 14일 안에 시험일이 있으면 시험 2주 전이거나 시험 기간 중이다
-    if (String(r.EVENT_NM).indexOf(EXAM_WORD) >= 0) {
-      ex.all = true;
-      if (!ex.reasons.some(function (reason) { return reason.category === 'exam'; })) {
-        ex.reasons.push({ category: 'exam', title: String(r.EVENT_NM), message: '시험 기간입니다' });
-      }
-    }
-    if (r.AA_YMD !== ymd) return;
-    if (r.SBTR_DD_SC_NM === '휴업일' || r.SBTR_DD_SC_NM === '공휴일') {
-      ex.all = true;
-      ex.reasons.push({ category: 'closed', title: String(r.EVENT_NM || r.SBTR_DD_SC_NM),
-        message: '오늘은 등교하지 않는 날입니다' });
-    }
-    if (EXEMPT_EVENT_WORDS.some(function (w) { return String(r.EVENT_NM).indexOf(w) >= 0; })) {
-      [1, 2, 3].forEach(function (g) { if (r[GRADE_FLAG[g]] === 'Y') ex.grades[g] = true; });
-    }
-  });
-  return ex;
-}
-
 function isExempt_(ex, grade) {
   return ex.all || ex.grades[grade];
 }
 
-// NEIS 조회 결과는 6시간 캐시한다. 조회에 실패하면 예외를 던진다.
-function exemption_(date) {
-  var cache = CacheService.getScriptCache();
-  var hit = cache.get('exempt:' + date);
-  if (hit) return JSON.parse(hit);
+// ---------- NEIS 학사일정 → SchoolDays 시트 ----------
+// 이번 학년도(3월~다음 해 2월)의 휴업일·공휴일·정기시험·학년별 행사를 SchoolDays 행으로 가져온다.
+// 가져온 뒤에는 관리자가 일정 관리에서 수정·해제할 수 있고, 같은 일정(neisKey)은 다시 만들지 않는다.
+var NEIS_SYNC_MS_ = 24 * 60 * 60 * 1000;
 
-  var from = parseDate_(date).start;
+function addDays_(date, n) {
+  return today_(new Date(parseDate_(date).start.getTime() + n * 86400000));
+}
+
+// 두 날짜 사이가 주말이거나 covered(다른 휴업일·공휴일)뿐이면 한 기간으로 이어 준다.
+// NEIS는 방학 중의 주말이나 신정 같은 공휴일에 방학 행을 빼고 주는 경우가 있다.
+function neisBridged_(a, b, covered) {
+  for (var x = addDays_(a, 1); x < b; x = addDays_(x, 1)) {
+    if (parseDate_(x).day && !covered[x]) return false;
+  }
+  return true;
+}
+
+// 반환: 새로 만든 건수. force가 아니면 하루 한 번만, 실패 후에는 10분 뒤에 다시 시도한다.
+function syncNeisSchedule_(force) {
+  var props = PropertiesService.getScriptProperties();
+  var cache = CacheService.getScriptCache();
+  if (!force) {
+    if (cache.get('neis-retry')) return 0;
+    if (Date.now() - Number(props.getProperty('NEIS_SYNCED') || 0) < NEIS_SYNC_MS_) return 0;
+  }
+  cache.put('neis-retry', '1', 600);
+
+  var now = today_();
+  var year = Number(now.slice(0, 4)) - (now.slice(5, 7) < '03' ? 1 : 0);
   var params = schoolParams_();
-  params.AA_FROM_YMD = date.replace(/-/g, '');
-  params.AA_TO_YMD = today_(new Date(from.getTime() + EXAM_LEAD_DAYS * 24 * 60 * 60 * 1000)).replace(/-/g, '');
-  params.pSize = 100;
+  params.AA_FROM_YMD = year + '0301';
+  params.AA_TO_YMD = addDays_((year + 1) + '-03-01', -1).replace(/-/g, '');
+  params.pSize = 1000;
   var r = neisRows_(neis_('SchoolSchedule', params), 'SchoolSchedule');
-  // INFO-200은 "일정 없음"이라 정상이다. 그 밖의 코드(키 오류 등)는 실패로 본다.
   if (r.code !== 'INFO-000' && r.code !== 'INFO-200') throw new Error('NEIS 응답 오류: ' + r.code);
 
-  var ex = exemptFrom_(r.rows, date);
-  cache.put('exempt:' + date, JSON.stringify(ex), 6 * 60 * 60);
-  return ex;
+  // 같은 이름의 연속된 날짜를 한 기간으로 묶는다 (예: 겨울방학, 시험 3일).
+  var days = {}, closedDates = {};
+  r.rows.forEach(function (row) {
+    var title = String(row.EVENT_NM).trim();
+    var category = row.SBTR_DD_SC_NM === '휴업일' || row.SBTR_DD_SC_NM === '공휴일' ? 'closed'
+      : title.indexOf(EXAM_WORD) >= 0 ? 'exam'
+      : EXEMPT_EVENT_WORDS.some(function (w) { return title.indexOf(w) >= 0; }) ? 'event' : null;
+    var date = row.AA_YMD.slice(0, 4) + '-' + row.AA_YMD.slice(4, 6) + '-' + row.AA_YMD.slice(6);
+    if (category === 'closed') closedDates[date] = true;
+    if (!category || !title || title === '토요휴업일') return; // 주말은 이미 면제라 가져오지 않는다
+    // 학년별 행사는 NEIS의 학년 표시가 Y인 학년만 면제한다. 해당 학년이 없으면 건너뛴다.
+    var grades = category === 'event' ? [1, 2, 3].filter(function (g) { return row[GRADE_FLAG[g]] === 'Y'; }).join(',') : '';
+    if (category === 'event' && !grades) return;
+    var key = JSON.stringify([category, title, grades]);
+    (days[key] = days[key] || {})[date] = true;
+  });
+  var items = [];
+  Object.keys(days).forEach(function (key) {
+    var p = JSON.parse(key), category = p[0], title = p[1], grades = p[2];
+    var sorted = Object.keys(days[key]).sort();
+    var start = sorted[0], prev = start;
+    sorted.slice(1).concat(['']).forEach(function (d) {
+      if (d && neisBridged_(prev, d, category === 'exam' ? {} : closedDates)) { prev = d; return; }
+      items.push({ category: category, title: title, grades: grades, startDate: start, endDate: prev,
+        neisKey: category + '|' + start + '|' + prev + '|' + title + (grades ? '|' + grades : '') });
+      start = prev = d;
+    });
+  });
+
+  return locked_(function () {
+    var rows = read_('SchoolDays');
+    var known = {};
+    rows.forEach(function (x) { if (x.neisKey) known[x.neisKey] = true; });
+    var fresh = items.filter(function (i) { return !known[i.neisKey]; });
+    if (fresh.length) {
+      var cols = SCHEMA.SchoolDays, stamp = new Date().toISOString();
+      var nextId = rows.reduce(function (m, x) { return Math.max(m, x.id); }, 0);
+      var values = fresh.map(function (it, i) {
+        var row = { id: nextId + i + 1, startDate: it.startDate, endDate: it.endDate, category: it.category,
+          title: it.title, supersedesId: 0, cancelled: 0, createdAt: stamp, updatedAt: stamp,
+          grades: it.grades, neisKey: it.neisKey };
+        return cols.map(function (c) { return row[c]; });
+      });
+      var sh = sheet_('SchoolDays');
+      var range = sh.getRange(sh.getLastRow() + 1, 1, values.length, cols.length);
+      range.setNumberFormats(values.map(function () {
+        return cols.map(function (c) { return TEXT_COLS.indexOf(c) >= 0 ? '@' : '0'; });
+      }));
+      range.setValues(values);
+    }
+    props.setProperty('NEIS_SYNCED', String(Date.now()));
+    return fresh.length;
+  });
 }

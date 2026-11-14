@@ -81,12 +81,32 @@ test("maintenance entrypoints are private to Apps Script", () => {
   assert.match(code, /function\s+api_applyPromotion\s*\(/);
 });
 
+test("editor wrappers run only for the script owner", () => {
+  const { context } = setup();
+  const calls = [];
+  context.setup_ = () => calls.push("setup");
+  context.findSchool_ = () => calls.push("find");
+  const as = (active, effective) => {
+    context.Session = { getActiveUser: () => ({ getEmail: () => active }), getEffectiveUser: () => ({ getEmail: () => effective }) };
+  };
+  as("", "owner@example.com"); // 익명 웹 방문자
+  assert.throws(() => context.runSetup(), /소유자/);
+  assert.throws(() => context.runFindSchool(), /소유자/);
+  as("other@example.com", "owner@example.com"); // 다른 로그인 사용자
+  assert.throws(() => context.runSetup(), /소유자/);
+  assert.deepEqual(calls, []);
+  as("owner@example.com", "owner@example.com"); // 편집기에서 소유자가 실행
+  context.runSetup();
+  context.runFindSchool();
+  assert.deepEqual(calls, ["setup", "find"]);
+});
+
 test("all administrative server endpoints call authorization first", () => {
   for (const name of ["api_admin", "api_members", "api_addMember", "api_updateMember",
     "api_deleteMember", "api_graduate", "api_restore", "api_csv",
     "api_promotionPreview", "api_applyPromotion", "api_rosterAudit",
-    "api_schoolRules", "api_schoolRuleSave", "api_schoolRuleCancel",
-    "api_excuseAbsence", "api_calendarMonth", "api_calendarAdd", "api_calendarDelete"]) {
+    "api_schoolRules", "api_schoolRulesSync", "api_schoolRuleSave", "api_schoolRuleCancel",
+    "api_excuseAbsence", "api_markPresent", "api_calendarAdd", "api_calendarDelete"]) {
     const moduleSource = name === "api_rosterAudit" ? audit :
       name.startsWith("api_school") || name === "api_excuseAbsence" ? school :
       name.startsWith("api_calendar") ? calendar : code;

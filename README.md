@@ -30,7 +30,7 @@ start preview-ui.html
 
 1. `clasp push -f`로 올립니다. (`.clasp.json`의 `scriptId`는 직접 만들어야 합니다: `clasp create` 또는 `clasp clone <scriptId>`)
 2. 스크립트 속성에 `NEIS_KEY`(NEIS 인증키)를 추가합니다.
-3. 편집기에서 `setup_`(시트·트리거 생성), `findSchool_`(학교 코드 저장)을 한 번씩 실행합니다.
+3. 편집기에서 `runSetup`(시트·트리거 생성), `runFindSchool`(학교 코드 저장)을 한 번씩 실행합니다. 소유자만 실행할 수 있습니다.
 4. 배포 → 웹 앱(실행 계정: 나, 액세스: 모든 사용자)으로 배포합니다. 코드를 고친 뒤에는 배포 관리에서 새 버전으로 올려야 반영됩니다.
 
 ## 규칙

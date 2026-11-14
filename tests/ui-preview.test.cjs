@@ -127,7 +127,7 @@ test("monthly calendar and school rule editor are available only in the admin UI
   const html = fs.readFileSync(htmlPath, "utf8");
   const client = html.match(/<script>([\s\S]*?)<\/script>\s*<\/body>/)?.[1] || "";
   assert.match(client, /calendar: \['달력', renderCalendar\]/);
-  assert.match(client, /adminApi\('api_calendarMonth', calendarMonth\)/);
+  assert.match(client, /api\('api_calendarMonth', calendarMonth\)/);
   assert.match(client, /adminApi\('api_schoolRuleSave', data, rule\?\.id \|\| 0\)/);
   assert.match(client, /adminApi\('api_schoolRuleCancel', rule\.id\)/);
   assert.match(client, /adminApi\('api_excuseAbsence', miss\.id\)/);

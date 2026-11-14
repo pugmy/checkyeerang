@@ -69,7 +69,7 @@ function calendarBuildMonth_(month, users, events, records, notes, baseline, sch
     var dayRecords = (recordsByDate[date] || []).map(function (r) {
       var person = usersById[r.userId];
       return { id: r.id, kind: r.kind, userId: r.userId,
-        name: person ? person.name : '부원 ' + r.userId, detail: r.detail || '', shift: r.shift };
+        name: person ? person.name : '부원 ' + r.userId, shift: r.shift };
     });
     var dayNotes = (notesByDate[date] || []).map(function (n) {
       var person = usersById[n.userId];
@@ -85,8 +85,8 @@ function calendarBuildMonth_(month, users, events, records, notes, baseline, sch
   return { ok: true, month: month, days: days };
 }
 
-function api_calendarMonth(month, token) {
-  requireAdmin_(token);
+// 달력 조회는 로그인 없이 볼 수 있다(일정 추가·삭제와 등교·시험 일정 관리만 관리자 전용). 출석 특이사항(detail)은 내보내지 않는다.
+function api_calendarMonth(month) {
   var baseline = PropertiesService.getScriptProperties().getProperty('ROSTER_BASELINE_AT');
   if (!calendarMonthRange_(month)) return { ok: false, message: '조회할 월을 확인해 주세요.' };
   var first = calendarMonthRange_(month);

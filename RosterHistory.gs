@@ -41,7 +41,7 @@ function rosterBaseline_() {
 
 function rosterRequireBaseline_() {
   if (!PropertiesService.getScriptProperties().getProperty('ROSTER_BASELINE_AT')) {
-    throw new Error('시간표 이력이 준비되지 않았습니다. 관리자가 setup_을 실행해야 합니다.');
+    throw new Error('시간표 이력이 준비되지 않았습니다. 관리자가 편집기에서 runSetup을 실행해야 합니다.');
   }
 }
 

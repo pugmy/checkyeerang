@@ -1,6 +1,6 @@
 // School attendance exemptions are administered separately from ordinary calendar notes.
 // Dates are inclusive in Asia/Seoul. Revisions are append-only; the latest revision wins.
-var SCHOOL_RULE_CATEGORIES_ = ['closed', 'exam'];
+var SCHOOL_RULE_CATEGORIES_ = ['closed', 'exam', 'event'];
 function schoolRulesCurrent_(rows) {
   var superseded = {};
   rows.forEach(function (r) { if (r.supersedesId > 0) superseded[r.supersedesId] = true; });
@@ -16,11 +16,21 @@ function schoolRuleValidate_(d) {
   if (typeof d.title !== 'string' || !d.title.trim() || d.title.trim().length > 80) {
     return '일정 이름은 1~80자로 입력해 주세요.';
   }
+  if (d.category === 'event' && !/^[123](,[123])*$/.test(String(d.grades))) return '대상 학년을 선택해 주세요.';
   return null;
 }
+// event는 grades("1", "1,2" 등)에 적힌 학년만 면제하는 행사다. closed·exam은 전원 면제다.
 function schoolRuleExemption_(date, rows) {
   var reasons = [];
+  var grades = { 1: false, 2: false, 3: false };
   schoolRulesCurrent_(rows).forEach(function (r) {
+    if (r.category === 'event') {
+      if (r.startDate <= date && date <= r.endDate) {
+        String(r.grades).split(',').forEach(function (g) { grades[Number(g)] = true; });
+        reasons.push({ category: 'event', title: r.title, message: r.title + ' · 해당 학년 면제', grades: r.grades });
+      }
+      return;
+    }
     var begin = r.startDate;
     if (r.category === 'exam') {
       var start = parseDate_(r.startDate);
@@ -28,10 +38,12 @@ function schoolRuleExemption_(date, rows) {
     }
     if (begin <= date && date <= r.endDate) {
       reasons.push({ category: r.category, title: r.title,
-        message: r.category === 'exam' ? '시험 기간입니다' : r.title + ' · 등교하지 않는 날' });
+        message: r.category === 'exam' ? '시험 기간입니다' : r.title + ' · 등교하지 않는 날',
+        lead: r.category === 'exam' && date < r.startDate }); // 시험 전 14일(시험일 아님)
     }
   });
-  return { all: reasons.length > 0, reasons: reasons };
+  var all = reasons.some(function (r) { return r.category !== 'event'; });
+  return { all: all, grades: grades, reasons: reasons };
 }
 function schoolRuleEffective_(date) {
   return schoolRuleExemption_(date, read_('SchoolDays'));
@@ -54,7 +66,8 @@ function api_schoolRuleSave(data, replaceId, token) {
       return result_(false, '이미 변경된 일정입니다. 목록을 다시 불러와 주세요.');
     }
     var row = insert_('SchoolDays', { startDate: data.startDate, endDate: data.endDate,
-      category: data.category, title: data.title.trim(), supersedesId: replaceId, cancelled: 0 });
+      category: data.category, title: data.title.trim(), supersedesId: replaceId, cancelled: 0,
+      grades: data.category === 'event' ? String(data.grades) : '', neisKey: '' });
     return row ? { ok: true, id: row.id } : result_(false, '일정을 저장하지 못했습니다.');
   });
 }
@@ -67,17 +80,28 @@ function api_schoolRuleCancel(id, token) {
     var target = current.filter(function (r) { return r.id === id; })[0];
     if (!target) return result_(false, '이미 변경된 일정입니다.');
     var row = insert_('SchoolDays', { startDate: target.startDate, endDate: target.endDate,
-      category: target.category, title: target.title, supersedesId: id, cancelled: 1 });
+      category: target.category, title: target.title, supersedesId: id, cancelled: 1,
+      grades: target.grades || '', neisKey: '' });
     return row ? result_(true, '면제 일정을 해제했습니다. 과거 결석 기록은 자동 삭제되지 않습니다.') :
       result_(false, '일정을 변경하지 못했습니다.');
   });
 }
+// 면제는 모두 SchoolDays(NEIS에서 가져와 사람이 고칠 수 있는 시트)가 기준이다.
 function schoolExemption_(date) {
   var manual = schoolRuleEffective_(date);
-  if (manual.all) return { all: true, grades: { 1: true, 2: true, 3: true }, reasons: manual.reasons };
-  return exemption_(date);
+  return { all: manual.all, grades: manual.all ? { 1: true, 2: true, 3: true } : manual.grades, reasons: manual.reasons };
 }
 
+// NEIS 학사일정(휴업일·공휴일·정기시험·학년별 행사)을 일정 목록으로 가져온다. 이미 가져왔거나 수정·해제한 일정은 다시 만들지 않는다.
+function api_schoolRulesSync(token) {
+  requireAdmin_(token);
+  try {
+    var added = syncNeisSchedule_(true);
+    return result_(true, added ? 'NEIS에서 일정 ' + added + '건을 가져왔습니다.' : '새로 가져올 일정이 없습니다.');
+  } catch (e) {
+    return result_(false, 'NEIS에서 일정을 가져오지 못했습니다: ' + e.message);
+  }
+}
 
 function api_excuseAbsence(absenceId, token) {
   requireAdmin_(token);
