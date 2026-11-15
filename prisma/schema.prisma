@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// type: 1 재학생, 0 졸업생, -1 명단 제외
+// day: 1~5 월~금, shift: 1 점심 전, 3 점심 후, 2 저녁
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  grade     Int      @default(1)
+  day       Int
+  shift     Int      @default(1)
+  workCount Int      @default(0)
+  addCount  Int      @default(0)
+  runCount  Int      @default(0)
+  type      Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  choolsucks Choolsuck[]
+  history    RosterHistory[]
+}
+
+// kind: duty 당번 출석, makeup 보충(shift 0), absent 결석, excused 면제 정정된 결석
+model Choolsuck {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  day       Int
+  shift     Int      @default(1)
+  kind      String   @default("duty")
+  date      String   @default("") // YYYY-MM-DD (한국 날짜)
+  detail    String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date, shift, kind])
+  @@index([date])
+}
+
+// 변경 시점만 저장하는 시간표 이력. patch에는 바뀐 필드(name, grade, day, shift, type)만 담는다.
+model RosterHistory {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  effectiveAt DateTime
+  patch       Json
+  createdAt   DateTime @default(now())
+
+  @@index([userId, effectiveAt])
+}
+
+// category: activity 활동·행사, makeup_plan 보충 예정, notice 메모
+model CalendarNote {
+  id        Int      @id @default(autoincrement())
+  date      String
+  category  String
+  title     String
+  detail    String   @default("")
+  userId    Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([date])
+}
+
+// 수동 면제 일정(휴업/시험). 수정·해제는 새 행을 추가하는 방식(supersedesId)이다.
+model SchoolDay {
+  id           Int      @id @default(autoincrement())
+  startDate    String
+  endDate      String
+  category     String // closed | exam | event
+  title        String
+  supersedesId Int      @default(0)
+  cancelled    Boolean  @default(false)
+  grades       String   @default("") // category가 event일 때 면제되는 학년 ("1", "1,2" 등)
+  neisKey      String   @default("") // NEIS에서 가져온 일정의 식별값. 수정·해제 뒤에도 남겨 다시 가져오지 않게 한다.
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model AttendanceCorrection {
+  id        Int      @id @default(autoincrement())
+  absenceId Int
+  userId    Int
+  date      String
+  shift     Int
+  reason    String
+  createdAt DateTime @default(now())
+}
+
+// ROSTER_BASELINE_AT, PROMOTED_YEAR, PROMOTION_PENDING_YEAR, ADMIN_FAILED 등
+model Setting {
+  key   String @id
+  value String
+}
+
+model AdminSession {
+  tokenHash String   @id
+  expiresAt DateTime
+}
