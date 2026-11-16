@@ -91,6 +91,11 @@ export function mountApp() {
   function logoutControl() {
     return h('button', { type: 'button', class: 'btn ghost sm', onclick: logoutAdmin }, '로그아웃');
   }
+  // 달력은 누구나 보지만 추가·삭제·일정 관리는 로그인 후에만. 로그인 전이면 로그인 화면을 거쳐 달력으로 돌아온다.
+  function needAdmin(action) {
+    if (adminToken) return action();
+    main.replaceChildren(adminLoginView('calendar'));
+  }
 
   const svg = (d, cls) => {
     const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -372,13 +377,13 @@ export function mountApp() {
           h('span', {}, CALENDAR_LABELS[note.category] + ' · ' +
             (note.name ? note.name + ' · ' : '') + note.title,
             note.detail ? h('small', { class: 'calendar-caption' }, note.detail) : null),
-          h('button', { type: 'button', class: 'btn ghost sm', onclick: async () => {
+          h('button', { type: 'button', class: 'btn ghost sm', onclick: () => needAdmin(async () => {
             if (!(await ask('이 일정을 삭제할까요?'))) return;
             try {
               const res = await adminApi('api_calendarDelete', note.id);
               if (res.ok) show('calendar'); else notify(res.message);
             } catch (e) { notify(errText(e)); }
-          } }, '삭제')));
+          }) }, '삭제')));
       // 휴업·공휴일·시험 일정(NEIS에서 가져왔거나 일정 관리에서 등록한 것)도 같은 목록에 읽기 전용으로 보여 준다.
       const schoolRows = (day.school?.reasons || []).map(r =>
         h('li', { class: 'calendar-detail-row' },
@@ -394,7 +399,7 @@ export function mountApp() {
             h('button', { class: 'btn ghost sm', type: 'button', onclick: () => {
               adminDate = date; show('admin');
             } }, '출석 기록 보기'),
-            h('button', { class: 'btn primary sm', type: 'button', onclick: () => calendarNoteModal(date) }, '+ 일정 추가'))),
+            h('button', { class: 'btn primary sm', type: 'button', onclick: () => needAdmin(() => calendarNoteModal(date)) }, '+ 일정 추가'))),
         day.school?.all && h('p', { class: 'school-notice', role: 'note' },
           day.school.reasons.some(r => r.category === 'exam') ? '시험 기간입니다' : '출석 의무가 없는 날입니다'),
         day.needsReview && h('p', { class: 'bad-text', role: 'note' },
@@ -471,10 +476,10 @@ export function mountApp() {
         h('div', {}, h('h1', { class: 'title' }, '도서관 일정'),
           h('p', { class: 'muted' }, '날짜를 선택해 당번과 행사, 보충 예정 및 출석 기록을 확인하세요.')),
         h('div', { class: 'row wrap' },
-          h('button', { class: 'btn ghost sm', type: 'button', onclick: async () => {
+          h('button', { class: 'btn ghost sm', type: 'button', onclick: () => needAdmin(async () => {
             try { await schoolRulesModal(); } catch (e) { notify(errText(e)); }
-          } }, '일정 관리'),
-          logoutControl())),
+          }) }, '일정 관리'),
+          adminToken ? logoutControl() : null)),
       h('div', { class: 'calendar-toolbar' },
         h('button', { type: 'button', class: 'btn ghost sm',
           onclick: () => { calendarMonth = calendarMove(calendarMonth, -1); show('calendar'); } }, '이전 달'),
@@ -486,7 +491,8 @@ export function mountApp() {
   }
 
   // ---------- 탭 ----------
-  const tabs = { home: ['출석체크', renderHome], admin: ['출석관리', renderAdmin], member: ['부원관리', renderMember], calendar: ['달력', renderCalendar] };
+  const tabs = { home: ['출석체크', renderHome], calendar: ['달력', renderCalendar], admin: ['출석관리', renderAdmin], member: ['부원관리', renderMember] };
+  const OPEN_TABS = ['home', 'calendar'];
   const nav = document.getElementById('nav');
   const main = document.getElementById('main');
   let token = 0;
@@ -499,7 +505,7 @@ export function mountApp() {
     nav.querySelector('[data-tab="' + name + '"]').setAttribute('aria-current', 'page');
     main.replaceChildren(skeleton('1.5rem', '9rem', '3rem'));
     try {
-      const el = name !== 'home' && !adminToken ? adminLoginView(name) : await tabs[name][1]();
+      const el = !OPEN_TABS.includes(name) && !adminToken ? adminLoginView(name) : await tabs[name][1]();
       if (mine === token) main.replaceChildren(el);
     } catch (e) {
       if (mine === token) main.replaceChildren(h('div', { class: 'card big' }, h('p', { class: 'bad-text bold' }, errText(e)), h('button', { class: 'btn ghost mt4', onclick: () => show(name) }, '다시 시도')));
