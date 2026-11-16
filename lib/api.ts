@@ -501,8 +501,8 @@ export function buildMonth(
   return { ok: true, month, days };
 }
 
-export async function api_calendarMonth(month: unknown, token: unknown) {
-  await requireAdmin(token);
+// 조회는 로그인 없이 열어 둔다. 추가·삭제·일정 관리만 관리자 확인을 거친다.
+export async function api_calendarMonth(month: unknown) {
   const range = monthRange(month);
   if (!range) return { ok: false, message: "조회할 월을 확인해 주세요." };
   const gte = dateAt(range.begin, 0), lte = dateAt(range.begin, 41);
